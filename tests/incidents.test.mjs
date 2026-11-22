@@ -62,3 +62,9 @@ test("vessels require a stationary baseline, real displacement and two fresh mov
  assert.equal(detectAssetActivity([report("vessel",0,{speed:12,lat:55.81})],{},now).events.length,0);
  const drift=detectAssetActivity([report("vessel",30000,{speed:6,lat:55.80001})],dock.state,now+30000);assert.equal(drift.events.length,0);
 });
+
+test("the published Traffic Wales empty-channel format is a valid no-incident response",()=>{
+ const xml='<?xml version="1.0" encoding="utf-8"?><rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0"><channel>   </channel></rss>';
+ const result=parseIncidentFeed(xml,source,now);assert.deepEqual(result.events,[]);assert.equal(result.receivedItems,0);assert.equal(result.latestSourceAt,null);
+ assert.throws(()=>parseIncidentFeed('<html><body>Unavailable</body></html>',source,now));
+});
