@@ -5,6 +5,7 @@ import { aircraftPolicy, DAY_MS, normalizeAircraft, normalizeVessels, mergeAircr
 import { captureAircraftTrails } from "./trail-store";
 import { readAircraftKey } from "./aircraft-key.mjs";
 import { fetchWithoutRedirect } from "./edge-fetch.mjs";
+import {captureAssetActivity} from "./incident-store";
 
 export const runtimeEnv = () => env as Cloudflare.Env & {
   ADSB_PROVIDER?: string; ADSB_LOL_FREE_KEY?: string; MAPTILER_BROWSER_KEY?: string;
@@ -27,6 +28,7 @@ export async function recordAircraftPayload(payload:unknown,provider="adsblol"){
   const result=mergeAircraftSnapshots(received,prior);
   await db.prepare("UPDATE feed_state SET snapshot=?,fetched_at=?,blocked_until=0,last_error=NULL WHERE id=?").bind(JSON.stringify(result),Date.now(),`aircraft-${provider}`).run();
   try{await captureAircraftTrails([...(prior.records||[]),...received.records]);}catch{console.warn("Aircraft trail capture temporarily unavailable");}
+  try{await captureAssetActivity(db,received.records);}catch{console.warn("Aircraft activity capture temporarily unavailable");}
   return result;
 }
 
@@ -96,5 +98,6 @@ export async function ingestVessels(input:unknown) {
     if(write.meta.changes){saved=true;break;}
   }
   if(!saved)throw new Error("A concurrent vessel update is in progress; the collector will retry.");
+  try{await captureAssetActivity(db,records);}catch{console.warn("Vessel activity capture temporarily unavailable");}
   return records.length;
 }

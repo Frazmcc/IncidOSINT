@@ -65,3 +65,11 @@ Source references and data qualifications are retained in each dataset. Existing
 ## Import provenance
 
 Imported from published source commit `d8cdf959e309683b34502bad097bc16aa8ed41eb` on 22 November 2026, including the squawk display, light effects and collapsible sidebar. Generated collector bundles/maps under `collector/cloudflare/outputs/` are excluded. Runtime secrets, local databases, dependencies, build directories and source Git history are excluded from this import.
+
+## Incident reports and detected activity
+
+The Reports & activity layer now combines the free, reusable Traffic Wales and TrafficWatchNI incident RSS feeds with activity detected from the existing ADS-B/AIS observations. It keeps a 24-hour view, uses balanced movement rules and offers in-app alerts and optional small map pins. Public reports and inferred activity have distinct labels; a movement pin is not a confirmed emergency location. No paid geocoder or messaging service is used.
+
+One shared source reservation prevents visitors from multiplying upstream calls. Browser checks target 30 seconds; the two RSS feeds publish about every five minutes. Each source is capped at 288 requests per rolling daily window. Activity/event writes have a 6,000-reservation daily cap. Existing authenticated collector check-ins schedule source refresh without delaying aircraft leases, so the current external collector does not need redeployment.
+
+RNLI launches remain disabled pending written reuse permission. Traffic Scotland and National Highways await the relevant free access/approval; fire and Coastguard sites are links until a permitted automated feed is verified. No accounts, subscriptions or paid services are created. The source panel shows these states explicitly. Read [the incident-layer guide](docs/INCIDENTS.md) for source policies, limits, detection rules and validation.

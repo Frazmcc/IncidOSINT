@@ -1,0 +1,49 @@
+"use client";
+import {useEffect,useRef,useState} from "react";
+import {Bell,BellOff,ExternalLink,MapPin,Radio,TriangleAlert,X} from "lucide-react";
+
+export type IncidentEvent={id:string;kind:"incident";title:string;summary:string;sourceName:string;sourceUrl:string|null;relatedLinks?:string[];attribution:string;licenceUrl?:string;confidence:"reported"|"inferred";category:string;eventType:string;eventAt:number;firstSeenAt:number;timeBasis:string;lat:number|null;lon:number|null;locationBasis:string;assetId?:string;assetName?:string;identifier?:string};
+const time=(at:number)=>new Date(at).toLocaleString("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"Europe/London"});
+const link=(url:unknown)=>{try{const u=new URL(String(url));return ["https:","http:"].includes(u.protocol)&&!u.username&&!u.password?String(url):undefined;}catch{return undefined;}};
+const initial={events:[] as IncidentEvent[],sources:[] as any[],servedAt:0,collectionMode:"",writeBudget:{paused:false}};
+
+export function useIncidentFeed(paused:boolean){
+ const [data,setData]=useState<any>(initial),[error,setError]=useState(""),[loading,setLoading]=useState(true),[notifications,setNotifications]=useState(true),[pins,setPins]=useState(true),[notices,setNotices]=useState<IncidentEvent[]>([]);
+ const seen=useRef(new Set<string>()),seeded=useRef(false),enabled=useRef(true);
+ useEffect(()=>{try{const on=localStorage.getItem("incidosint-alerts")!=="0";enabled.current=on;setNotifications(on);setPins(localStorage.getItem("incidosint-incident-pins")!=="0");}catch{}},[]);
+ function toggleNotifications(){setNotifications(old=>{const next=!old;enabled.current=next;try{localStorage.setItem("incidosint-alerts",next?"1":"0");}catch{}return next;});setNotices([]);}
+ function togglePins(){setPins(old=>{try{localStorage.setItem("incidosint-incident-pins",old?"0":"1");}catch{}return !old;});}
+ useEffect(()=>{
+  if(paused){setLoading(false);return;}let active=true,busy=false;const controller=new AbortController();
+  async function run(){
+   if(busy||document.visibilityState==="hidden")return;busy=true;
+   try{const response=await fetch("/api/incidents",{cache:"no-store",signal:controller.signal}),value:any=await response.json();if(!response.ok||value.error)throw Error(value.error||"Incident updates are temporarily unavailable.");
+    if(!active)return;
+    const rows:IncidentEvent[]=value.events||[],now=Date.now();
+    if(seeded.current&&enabled.current){const added=rows.filter(e=>!seen.current.has(e.id)&&now-e.firstSeenAt<90_000);if(added.length)setNotices(old=>[...added,...old].slice(0,3));}
+    seen.current=new Set(rows.map(e=>e.id));seeded.current=true;setData(value);setError("");
+   }catch(e){if(active&&!controller.signal.aborted)setError(e instanceof Error?e.message:"Incident updates are temporarily unavailable.");}
+   finally{busy=false;if(active)setLoading(false);}
+  }
+  void run();const timer=setInterval(()=>void run(),30_000);document.addEventListener("visibilitychange",run);
+  return()=>{active=false;controller.abort();clearInterval(timer);document.removeEventListener("visibilitychange",run);};
+ },[paused]);
+ useEffect(()=>{if(!notices.length)return;const timer=setTimeout(()=>setNotices([]),15_000);return()=>clearTimeout(timer);},[notices]);
+ return {data,error,loading,notifications,toggleNotifications,pins,togglePins,notices,dismiss:(id:string)=>setNotices(rows=>rows.filter(r=>r.id!==id))};
+}
+
+export function IncidentList({feed,now,onSelect}:{feed:ReturnType<typeof useIncidentFeed>;now:number;onSelect:(event:IncidentEvent)=>void}){
+ const [filter,setFilter]=useState("all"),[expanded,setExpanded]=useState(false);
+ const events:IncidentEvent[]=(feed.data.events||[]).filter((e:IncidentEvent)=>now-e.eventAt<=86_400_000),rows=events.filter(e=>filter==="all"||e.confidence===filter);
+ const names:Record<string,string>={receiving:"Connected",stale:"Old source items",waiting:"Waiting",paused:"Paused",permission_required:"Permission needed",approval_required:"Access needed",review_required:"Link only"};
+ return <section className="incidents-section" aria-label="Incident reports and detected activity"><div className="section-heading"><h2><TriangleAlert size={17}/>Reports & activity</h2><span>{events.length}</span></div><p className="section-help">Last 24 hours · balanced detection. Checks every 30s; source updates can take longer.</p><div className="incident-controls"><label><input type="checkbox" checked={feed.pins} onChange={feed.togglePins}/>Map pins</label><button aria-pressed={feed.notifications} onClick={feed.toggleNotifications}>{feed.notifications?<Bell size={14}/>:<BellOff size={14}/>}In-app alerts {feed.notifications?"on":"off"}</button></div><div className="incident-filters" aria-label="Filter incident reports">{[["all","All"],["reported","Reported"],["inferred","Detected activity"]].map(([id,label])=><button key={id} aria-pressed={filter===id} onClick={()=>setFilter(id)}>{label}</button>)}</div>{feed.error&&<p className="incident-warning" role="status">{feed.error}</p>}{feed.data.writeBudget?.paused&&<p className="incident-warning">The free recording budget is paused. Earlier reports keep their original times.</p>}<div className="incident-list">{rows.slice(0,expanded?250:8).map(event=><button className={`incident-row ${event.confidence}`} key={event.id} onClick={()=>onSelect(event)}><span className="incident-row-symbol">{event.confidence==="reported"?<TriangleAlert size={17}/>:<Radio size={17}/>}</span><span><strong>{event.title}</strong><small>{event.confidence==="reported"?"Public report":"Inferred activity"} · {event.sourceName}</small><small>{time(event.eventAt)}{event.lat===null?" · location not supplied":""}</small></span></button>)}{!rows.length&&<p className="incident-empty">{feed.loading?"Checking free incident sources…":"No recent reports in this view. Public feeds may be empty or delayed; activity events build from newly received positions."}</p>}</div>{rows.length>8&&<button className="incident-more" onClick={()=>setExpanded(v=>!v)}>{expanded?"Show fewer":`Show all ${rows.length}`}</button>}<details className="incident-source-details"><summary>Free sources & access</summary><p>Orange pins are public reports. Blue pins are inferred activity. A detected departure, squawk or vessel movement does not confirm an emergency.</p>{feed.data.sources?.map((s:any)=><div className="incident-source" key={s.id}><div><a href={s.home} target="_blank" rel="noreferrer">{s.name}</a><span className={`source-state state-${s.status}`}>{names[s.status]||s.status}</span></div><small>{s.region} · {s.note}</small>{s.checkedAt&&<small>Checked {time(s.checkedAt)}{s.latestSourceAt?` · latest item ${time(s.latestSourceAt)}`:" · no incident items"}</small>}{s.message&&<small className="incident-warning">{s.message}</small>}{s.attribution&&<small>{s.attribution}{s.licenceUrl&&<> · <a href={s.licenceUrl} target="_blank" rel="noreferrer">Licence</a></>}</small>}</div>)}<p>One shared collector uses fixed free limits. No paid feed, geocoder, SMS service or automatic upgrade is used.</p></details></section>;
+}
+
+export function IncidentDetail({event,onClose,onViewAsset}:{event:IncidentEvent;onClose:()=>void;onViewAsset:()=>void}){
+ const source=link(event.sourceUrl),licence=link(event.licenceUrl);
+ return <div className="selection-card incident-detail"><button className="selection-close icon-button" aria-label="Close selected incident" onClick={onClose}><X size={19}/></button><span className="eyebrow">{event.confidence==="reported"?"PUBLIC INCIDENT REPORT":"INFERRED ACTIVITY · UNCONFIRMED"}</span><h2>{event.title}</h2><p className="selection-subtitle">{event.sourceName}</p><p className="incident-description">{event.summary}</p><dl><div><dt>{event.timeBasis==="received"?"First received":"Report time"}</dt><dd>{time(event.eventAt)}</dd></div>{event.assetName&&<div><dt>Tracked asset</dt><dd>{event.assetName}</dd></div>}<div><dt>Location</dt><dd>{event.lat!==null&&event.lon!==null?`${event.lat.toFixed(5)}, ${event.lon.toFixed(5)}`:"Not supplied by the source"}</dd></div></dl><p className="record-note">{event.locationBasis==="asset position"?"The pin marks the asset position at detection. The incident location and purpose of the journey are unknown.":event.locationBasis==="unlocated"?"This report stays in the list. No location has been guessed or substituted.":"Coordinates were supplied by the source."}</p>{event.confidence==="inferred"&&<p className="record-note">Training, routine work and repositioning can produce the same activity.</p>}<div className="selection-links">{source&&<a href={source} target="_blank" rel="noreferrer">{event.confidence==="inferred"?"Fleet identity source":"Open report"} <ExternalLink size={12}/></a>}{event.assetId&&<button onClick={onViewAsset}>View tracked asset</button>}</div>{Boolean(event.relatedLinks?.length)&&<details className="record-details"><summary>Source links</summary>{event.relatedLinks?.filter(url=>url!==event.sourceUrl&&link(url)).map(url=><p key={url}><a href={url} target="_blank" rel="noreferrer">{url}</a></p>)}</details>}<p className="incident-attribution">{event.attribution}{licence&&<> · <a href={licence} target="_blank" rel="noreferrer">Licence</a></>}</p></div>;
+}
+
+export function IncidentNotices({feed,onSelect}:{feed:ReturnType<typeof useIncidentFeed>;onSelect:(event:IncidentEvent)=>void}){
+ return <div className="incident-notices" aria-live="polite" aria-relevant="additions">{feed.notices.map(event=><div className="incident-notice" key={event.id}><button onClick={()=>{onSelect(event);feed.dismiss(event.id);}}><Bell size={16}/><span><strong>{event.title}</strong><small>{event.confidence==="reported"?"Public report":"Inferred activity"} · {event.sourceName}</small></span></button><button aria-label="Dismiss activity notification" onClick={()=>feed.dismiss(event.id)}><X size={16}/></button></div>)}</div>;
+}
