@@ -1,0 +1,8 @@
+{
+  "name": "logic-emergency-ais",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-05-22",
+  "durable_objects": {"bindings": [{"name": "AIS_COLLECTOR", "class_name": "RescueAIS"}]},
+  "migrations": [{"tag": "v1", "new_sqlite_classes": ["RescueAIS"]}],
+  "vars": {"SITE_URL": "https://logic-uk-ireland-rescue-vessels.starrycapybara8.chatgpt.site"}
+}

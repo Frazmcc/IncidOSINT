@@ -1,0 +1,58 @@
+{
+  "checked_date": "2026-11-22",
+  "record_count": 1887,
+  "counts_by_source": {
+    "rnli": 238,
+    "ourairports": 1350,
+    "NGA World Port Index / US Department of Energy mirror": 212,
+    "Irish Coast Guard official location directory": 62,
+    "HM Coastguard / MCA; OurAirports coordinates": 12,
+    "NPAS regional base list; OurAirports coordinates": 13
+  },
+  "licences": [
+    {
+      "source": "RNLI",
+      "attribution": "Contains Open Data licensed under the GIS Open Data Licence",
+      "url": "https://www.arcgis.com/sharing/rest/content/items/7dad2e58254345c08dfde737ec348166/info/metadata/metadata.xml?format=default&output=html"
+    },
+    {
+      "source": "OurAirports",
+      "attribution": "Airport locations from OurAirports; public domain",
+      "url": "https://ourairports.com/data/"
+    },
+    {
+      "source": "OpenStreetMap",
+      "attribution": "© OpenStreetMap contributors",
+      "url": "https://www.openstreetmap.org/copyright"
+    },
+    {
+      "source": "NGA World Port Index",
+      "attribution": "NGA World Port Index; US Department of Energy mirror. US Government data. No endorsement is implied.",
+      "url": "https://msi.nga.mil/Publications/WPI"
+    }
+  ],
+  "coverage_notes": [
+    "Documented static infrastructure reference, not a guarantee of complete coverage or current operational availability.",
+    "OurAirports includes GB, IE, IM, JE and GG nonclosed small/medium/large airports, heliports and seaplane bases. Closed and balloonport records are excluded.",
+    "General helipads/heliports remain general; police/ambulance association appears only when explicitly named in source text.",
+    "Source object IDs are unique within source. Cross-source colocated facilities are retained so attribution is not lost; map UI may group them.",
+    "OSM way/relation points are representative bounding-box centres, not surveyed entry points.",
+    "Original source records are retained separately without changing their source fields.",
+    "The OpenStreetMap facility extract was unavailable during collection. OSM facility coverage remains incomplete; no per-visitor Overpass calls are made.",
+    "UK Coastguard aviation bases include published airport reference locations; the complete UK volunteer coastguard rescue-station inventory is not yet mapped.",
+    "NPAS Carr Gate and Birmingham do not yet have a verified mapped pad in this bundle. Other police, ambulance and independent rescue pads/stations may also be missing.",
+    "Irish Coast Guard points are extracted from its official location directory. UK aviation base associations use HM Coastguard/MCA and NPAS lists, with host-airfield coordinates explicitly distinguished from exact pads.",
+    "Port points come from the NGA World Port Index dataset mirrored by the US Department of Energy. Port reference points and operational facilities can change."
+  ],
+  "ourairports_fetch": {
+    "url": "https://davidmegginson.github.io/ourairports-data/airports.csv",
+    "last_modified": "Sat, 21 Nov 2026 02:53:51 GMT",
+    "bytes": 12762645,
+    "ok": true
+  },
+  "openstreetmap_fetch": {
+    "url": "https://overpass-api.de/api/interpreter",
+    "ok": false,
+    "error": "The read operation timed out"
+  }
+}
