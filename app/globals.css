@@ -76,3 +76,5 @@
 
 /* Lifeboat illumination follows fresh AIS movement, never a retained position. */
 .track-marker.track-lifeboat-moving{filter:drop-shadow(0 1px 1px #071b2b) drop-shadow(0 0 3px #ff9b4380)}
+
+.owner-sign-in{display:inline-flex;text-decoration:none;align-items:center;justify-content:center;margin:14px 0}

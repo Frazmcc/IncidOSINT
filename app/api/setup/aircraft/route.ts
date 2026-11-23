@@ -3,13 +3,13 @@ import { runtimeEnv } from "../../../../lib/live-store";
 import { encryptAircraftKey, readAircraftKey } from "../../../../lib/aircraft-key.mjs";
 import { aircraftPolicy, normalizeAircraft, mergeAircraftSnapshots, retryDelay, DAY_MS } from "../../../../lib/tracking-core.mjs";
 import { fetchWithoutRedirect } from "../../../../lib/edge-fetch.mjs";
-import { SITE_ORIGIN } from "../../../../lib/cloudflare-setup.mjs";
+import {ownerAllowed,setupRequestAllowed} from "../../../../lib/site-security.mjs";
 import { captureAircraftTrails } from "../../../../lib/trail-store";
 import aircraft from "../../../../data/aircraft.json";
 export const dynamic="force-dynamic";
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{"Cache-Control":"no-store, private"}});
 const config=()=>runtimeEnv() as ReturnType<typeof runtimeEnv>&{COLLECTOR_OWNER_EMAIL?:string};
-async function owner(){const user=await getChatGPTUser();return Boolean(user&&config().COLLECTOR_OWNER_EMAIL?.toLowerCase()===user.email.toLowerCase());}
+async function owner(){const user=await getChatGPTUser();return ownerAllowed(user,config().COLLECTOR_OWNER_EMAIL);}
 
 export async function GET(){
   if(!await owner())return json({error:"Sign in with the website owner’s ChatGPT account."},403);
@@ -18,8 +18,7 @@ export async function GET(){
 }
 export async function POST(request:Request){
   if(!await owner())return json({error:"Only the signed-in website owner can connect an aircraft key."},403);
-  const origin=request.headers.get("Origin");
-  if(!origin||![SITE_ORIGIN,new URL(request.url).origin].includes(origin)||!request.headers.get("Content-Type")?.startsWith("application/json"))return json({error:"Use this website’s private aircraft connection screen."},403);
+  if(!setupRequestAllowed(request))return json({error:"Use this website’s private aircraft connection screen."},403);
   if(Number(request.headers.get("Content-Length")||0)>2000)return json({error:"Request too large."},413);
   const raw=await request.text();if(raw.length>2000)return json({error:"Request too large."},413);
   let body:any;try{body=JSON.parse(raw);}catch{return json({error:"Invalid connection details."},400);}

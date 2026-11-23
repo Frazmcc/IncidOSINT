@@ -1,4 +1,5 @@
 import { getChatGPTUser } from "../../../chatgpt-auth";
+import {ownerAllowed,setupRequestAllowed} from "../../../../lib/site-security.mjs";
 import { runtimeEnv } from "../../../../lib/live-store";
 import { COLLECTOR_NAME, SITE_ORIGIN, CF_API, verifyFreeAccount, collectorOrigin, validCollectorOrigin, uploadMetadata } from "../../../../lib/cloudflare-setup.mjs";
 import bundle from "../../../../data/collector-bundle.json";
@@ -10,7 +11,7 @@ const config=()=>runtimeEnv() as ReturnType<typeof runtimeEnv> & {COLLECTOR_OWNE
 
 async function authorized() {
   const user=await getChatGPTUser(), owner=config().COLLECTOR_OWNER_EMAIL;
-  return Boolean(user&&owner&&user.email.toLowerCase()===owner.toLowerCase());
+  return ownerAllowed(user,owner);
 }
 async function savedConfig() {
   const db=config().DB;
@@ -26,9 +27,7 @@ export async function GET() {
 }
 export async function POST(request:Request) {
   if(!await authorized())return json({error:"Only the signed-in website owner can change this connection."},403);
-  const origin=request.headers.get("Origin");
-  const url=new URL(request.url);
-  if(!origin||![SITE_ORIGIN,url.origin].includes(origin)||!request.headers.get("Content-Type")?.startsWith("application/json"))return json({error:"Open the connection page on this website and try again."},403);
+  if(!setupRequestAllowed(request))return json({error:"Open the connection page on this website and try again."},403);
   if(Number(request.headers.get("Content-Length")||0)>5000)return json({error:"Request is too large."},413);
   const text=await request.text();if(text.length>5000)return json({error:"Request is too large."},413);
   let body:any;try{body=JSON.parse(text);}catch{return json({error:"Invalid connection details."},400);}
