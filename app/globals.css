@@ -73,3 +73,6 @@
 .provider-waze .provider-back{top:112px}.provider-waze .provider-map-card{top:58px}
 .provider-graphics-fallback{position:absolute;left:25%;right:25%;top:40%;max-width:560px;color:#e8f1f8;text-align:center;line-height:1.7}.provider-graphics-fallback>svg{color:#f6ac74}.provider-graphics-fallback h2{font-size:23px;line-height:1.3;margin:14px 0}.provider-graphics-fallback p{color:#bbcedc;font-size:15px}.provider-graphics-fallback>a{display:inline-flex;align-items:center;gap:8px;color:#ffcd9f;font-size:15px}
 @media(max-width:720px){.provider-waze .provider-back{top:110px}.provider-waze .provider-map-card{top:auto}.provider-graphics-fallback{left:20px;right:20px;top:18%;max-width:none}.provider-graphics-fallback h2{font-size:20px}}
+
+/* Lifeboat illumination follows fresh AIS movement, never a retained position. */
+.track-marker.track-lifeboat-moving{filter:drop-shadow(0 1px 1px #071b2b) drop-shadow(0 0 3px #ff9b4380)}

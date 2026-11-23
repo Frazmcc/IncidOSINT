@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {ACTIVITY_MARKER_MAX_AGE_MS,incidentMarkerVisible} from "../lib/map-display.mjs";
+import {ACTIVITY_MARKER_MAX_AGE_MS,incidentMarkerVisible,lifeboatMovementConfirmed,lifeboatColor,LIFEBOAT_IDLE_COLOR,LIFEBOAT_MOVING_COLOR,LIFEBOAT_MOVEMENT_MAX_AGE_MS} from "../lib/map-display.mjs";
 import {aircraftPositionVisible,mergeAircraftSnapshots,normalizeAircraft,DAY_MS} from "../lib/tracking-core.mjs";
 import {aircraftLightPattern} from "../lib/aircraft-signals.mjs";
 import {mergeIncidentEvents} from "../lib/incident-core.mjs";
@@ -9,6 +9,27 @@ const now=1_800_000_000_000;
 const fleet=[{icao_hex:"4077c7",registration:"G-GSAS",category:"Air ambulance / HEMS",territory:"United Kingdom"}];
 const ground={id:"air-4077c7",identifier:"4077c7",name:"G-GSAS",kind:"aircraft",category:"Medical",onGround:true,lat:55.8,lon:-4.2,observedAt:now-DAY_MS,receivedAt:now-DAY_MS};
 const event={id:"activity:test",kind:"incident",confidence:"inferred",eventAt:now,firstSeenAt:now,lat:55.8,lon:-4.2};
+
+test("lifeboats illuminate orange only with a recent, usable AIS movement report",()=>{
+  const boat={kind:"vessel",category:"Lifeboat",speed:12,observedAt:now-20_000};
+  for(const speed of [1,3.5,12,102.2]){
+    assert.equal(lifeboatMovementConfirmed({...boat,speed},now),true);
+    assert.equal(lifeboatColor({...boat,speed},now),LIFEBOAT_MOVING_COLOR);
+  }
+  for(const extra of [{speed:0},{speed:0.9},{speed:null},{speed:undefined},{speed:NaN},{speed:Infinity},{speed:"12"},{speed:-1},{speed:102.3},{observedAt:null},{observedAt:0},{observedAt:now+1},{category:"Police"},{kind:"aircraft"}]){
+    assert.equal(lifeboatMovementConfirmed({...boat,...extra},now),false);
+    assert.equal(lifeboatColor({...boat,...extra},now),LIFEBOAT_IDLE_COLOR);
+  }
+});
+
+test("orange expires with the AIS observation and stops on a stationary report, while last-known positions remain visible",()=>{
+  const boat={kind:"vessel",category:"Lifeboat",speed:12,observedAt:now};
+  assert.equal(lifeboatColor(boat,now+LIFEBOAT_MOVEMENT_MAX_AGE_MS),LIFEBOAT_MOVING_COLOR);
+  assert.equal(lifeboatColor({...boat,receivedAt:now+LIFEBOAT_MOVEMENT_MAX_AGE_MS+1},now+LIFEBOAT_MOVEMENT_MAX_AGE_MS+1),LIFEBOAT_IDLE_COLOR);
+  assert.equal(lifeboatColor({...boat,speed:0,observedAt:now+10_000},now+10_000),LIFEBOAT_IDLE_COLOR);
+  assert.equal(lifeboatColor(boat,now+DAY_MS),LIFEBOAT_IDLE_COLOR);
+  assert.equal(lifeboatColor({...boat,observedAt:now+DAY_MS},now+DAY_MS),LIFEBOAT_MOVING_COLOR);
+});
 
 test("detected activity expires at 30 minutes without losing its 24-hour report or resetting on refresh",()=>{
   assert.equal(ACTIVITY_MARKER_MAX_AGE_MS,30*60*1000);
