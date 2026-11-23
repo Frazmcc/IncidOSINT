@@ -40,7 +40,7 @@ test("new take-offs replace saved ground coordinates and ground symbols suppress
   const incoming=normalizeAircraft({now,ac:[raw]},fleet,now);
   const [airborne]=mergeAircraftSnapshots(incoming,{records:[ground]},now,fleet).records;
   assert.equal(airborne.onGround,false);assert.equal(airborne.lat,55.9);assert.equal(airborne.observedAt,now);
-  assert.equal(aircraftLightPattern(airborne,now),"medical");
+  assert.equal(aircraftLightPattern(airborne,now),null);
   for(const category of ["Medical","Police","Coastguard"])assert.equal(aircraftLightPattern({...ground,category,territory:"United Kingdom",squawk:"0023",squawkObservedAt:now},now),null);
   assert.equal(mergeAircraftSnapshots({records:[],rejected:[]},{records:[airborne]},now+900001,fleet).records.length,0);
 });

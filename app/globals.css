@@ -40,10 +40,9 @@
 /* Light effects stay inside the original aircraft silhouette. */
 .light-effects-toggle{display:flex;align-items:center;gap:8px;padding:11px 22px;font-size:13px;color:#4a6277;border-bottom:1px solid #e3eaf0;background:#fafcfe}
 .squawk-row dd{text-align:right}.squawk-code{font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.squawk-row dd small{display:block;font-size:11px;font-weight:400;color:#61798d;line-height:1.5;margin-top:3px}.squawk-note{font-size:12px;line-height:1.6;color:#61798d;margin:10px 0}
-.track-light-red-blue{animation:aircraft-red-blue 1.8s steps(1,end) infinite}.track-light-medical{animation:aircraft-medical 2.4s steps(1,end) infinite}
-@keyframes aircraft-red-blue{0%,100%{--track-color:#ff4059}50%{--track-color:#359dff}}
-@keyframes aircraft-medical{0%,100%{--track-color:#ffda46}33.333%{--track-color:#ff4059}66.667%{--track-color:#359dff}}
-@media(prefers-reduced-motion:reduce){.track-light-red-blue,.track-light-medical{animation:none}}
+.track-light-red-blue{animation:aircraft-red-blue 1.8s steps(1,end) infinite}.track-light-red-blue{animation:aircraft-red-blue 1.8s steps(1,end) infinite}
+@keyframes aircraft-red-blue{0%,100%{--track-color:#ff4059}50%{--track-color:#4aa4ff}}
+@media(prefers-reduced-motion:reduce){.track-light-red-blue{animation:none}}
 
 /* The sidebar stays mounted so filters and lists survive a collapse. */
 .sidebar-collapse{flex-shrink:0;align-self:flex-start}
@@ -55,3 +54,22 @@
 
 /* Saved ground observations remain legible and never animate. */
 .track-marker.track-grounded{--track-color:#aab4bf;opacity:.85;animation:none}
+
+/* A standalone name floats over the full-height map. */
+.map-name{pointer-events:auto;color:#fff;text-decoration:none;font-size:21px;font-weight:760;letter-spacing:-.035em;text-shadow:0 1px 7px #000,0 1px 3px #000;background:#102337cc;padding:7px 11px;border:1px solid #6f859855;border-radius:5px;white-space:nowrap}
+.map-name span{color:#f6ac74}.road-views{padding:20px 22px;border-top:1px solid #dce4eb}.road-views h2{font-size:16px;margin:0 0 14px}.road-views>a{display:block;border:1px solid #c5d5e1;background:#f4f8fb;padding:10px 12px;border-radius:5px;margin:8px 0;text-decoration:none;font-size:15px;font-weight:600}.road-views p{font-size:13px;line-height:1.65;color:#5f788d;margin:12px 0 0}
+.service-filter button span{border:1px solid #152f4555}
+@media(max-width:800px){.sidebar{top:0;height:100dvh;max-height:100dvh}.map-topline{gap:8px}.map-name{font-size:18px;padding:8px}.map-home{padding:9px}.map-home span{display:none}.map-options{top:73px}}
+
+/* Provider maps stay in their own views with their attribution intact. */
+.provider-map-page{height:100dvh;position:relative;overflow:hidden;background:#172e43}
+.provider-map-frame{border:0;width:100%;height:100%;display:block}
+.provider-back{position:absolute;left:18px;top:18px;z-index:3;display:flex;align-items:center;gap:8px;background:#102337f2;border:1px solid #63829b80;border-radius:6px;padding:12px 15px;color:#f4f8fc;text-decoration:none;font-size:14px;box-shadow:0 3px 12px #12283b33}
+.provider-map-card{position:absolute;right:18px;top:18px;width:305px;max-height:calc(100dvh - 115px);overflow:auto;z-index:3;background:#fffffff5;border:1px solid #bacddb;border-radius:8px;padding:22px;box-shadow:0 7px 28px #0d213744}
+.provider-map-card .eyebrow{display:flex;gap:7px;align-items:center;font-size:11px;letter-spacing:.08em}.provider-map-card h1{font-size:24px}.provider-map-card p{font-size:14px;line-height:1.7;color:#4f697f;margin:13px 0}.provider-map-card .provider-map-note{font-size:13px;color:#657d90}
+.provider-map-links{display:flex;gap:12px;flex-wrap:wrap;align-items:center;padding-top:6px}.provider-map-links a{display:flex;gap:6px;align-items:center;font-size:14px;line-height:1.5}.road-area-label{display:block;font-size:14px;font-weight:650;color:#385a74;margin:18px 0}.road-area-select{position:relative;margin-top:7px}.road-area-select select{appearance:none;width:100%;height:42px;border:1px solid #b7ccdb;border-radius:5px;background:#f5f9fc;color:#244961;padding:8px 35px 8px 11px;font-size:14px}.road-area-select>svg{position:absolute;right:12px;top:13px;pointer-events:none;color:#648094}.provider-loading{font-size:13px!important;color:#31668b!important}
+@media(max-width:720px){.provider-back{left:10px;top:10px;font-size:13px;padding:10px}.provider-map-card{right:10px;top:auto;bottom:65px;width:260px;padding:16px;max-height:40dvh}.provider-map-card h1{font-size:20px}.provider-map-card p{font-size:13px}.provider-map-card .provider-map-note{display:none}.provider-map-card .road-area-label{margin:12px 0}.provider-map-links a{font-size:13px}}
+/* Keep Waze's own header, logo and search controls unobstructed. */
+.provider-waze .provider-back{top:112px}.provider-waze .provider-map-card{top:58px}
+.provider-graphics-fallback{position:absolute;left:25%;right:25%;top:40%;max-width:560px;color:#e8f1f8;text-align:center;line-height:1.7}.provider-graphics-fallback>svg{color:#f6ac74}.provider-graphics-fallback h2{font-size:23px;line-height:1.3;margin:14px 0}.provider-graphics-fallback p{color:#bbcedc;font-size:15px}.provider-graphics-fallback>a{display:inline-flex;align-items:center;gap:8px;color:#ffcd9f;font-size:15px}
+@media(max-width:720px){.provider-waze .provider-back{top:110px}.provider-waze .provider-map-card{top:auto}.provider-graphics-fallback{left:20px;right:20px;top:18%;max-width:none}.provider-graphics-fallback h2{font-size:20px}}

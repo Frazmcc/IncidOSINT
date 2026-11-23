@@ -14,10 +14,11 @@ test("four-digit octal squawks preserve leading zeroes and reject malformed valu
   const r=normalized(raw).records[0];assert.equal(r.squawk,"0032");assert.equal(r.squawkObservedAt,now-1000);assert.equal(r.observedAt,now-5000);
 });
 
-test("recent UK SAR and police codes use red/blue; medical aircraft use three colours except on the ground",()=>{
+test("eligible UK police and SAR signals use red/blue while medical and Coastguard aircraft keep their livery",()=>{
   const r=normalized(raw).records[0];
   assert.equal(aircraftLightPattern(r,now),"red-blue");
-  assert.equal(aircraftLightPattern({...r,category:"Coastguard",squawk:"0023"},now),"red-blue");
+  assert.equal(aircraftLightPattern({...r,category:"Coastguard",squawk:"0023"},now),null);
+  assert.equal(aircraftLightPattern({...r,category:"Fire",squawk:"0023"},now),"red-blue");
   for(const code of ["0041","0047","0054","0057","0061"])assert.equal(aircraftLightPattern({...r,squawk:code},now),"red-blue");
   for(const code of ["0040","0062","0058"])assert.equal(aircraftLightPattern({...r,squawk:code},now),null);
   assert.equal(aircraftLightPattern({...r,category:"Coastguard",squawk:"0054"},now),null);
@@ -27,7 +28,7 @@ test("recent UK SAR and police codes use red/blue; medical aircraft use three co
   assert.equal(aircraftLightPattern({...r,squawkObservedAt:now+60001},now),null);
   assert.equal(aircraftLightPattern({...r,territory:"Ireland"},now),null);
   assert.equal(squawkMeaning({...r,territory:"Ireland"}),null);
-  assert.equal(aircraftLightPattern({...r,category:"Medical",territory:"Ireland",squawk:null,squawkObservedAt:now-600000},now),"medical");
+  assert.equal(aircraftLightPattern({...r,category:"Medical",territory:"Ireland",squawk:null,squawkObservedAt:now-600000},now),null);
   assert.equal(aircraftLightPattern({...r,kind:"vessel",category:"Medical"},now),null);
 });
 
