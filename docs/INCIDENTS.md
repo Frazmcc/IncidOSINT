@@ -63,3 +63,10 @@ The [Scottish Road Works Register disruptions export](https://roadworks.scot/ope
 ## Marker livery and layout
 
 Air ambulances use solid yellow. Coastguard symbols use a red-and-white fill; these two services retain their livery even when a SAR code is present. Other eligible aircraft retain the existing recent UK squawk light rules. Aircraft explicitly reported on the ground remain plain grey without flashing. Squawks and their original report ages stay in details. The top search/header bar is removed; the IncidOSINT name is a standalone map overlay. The hideable sidebar retains filters, coverage information and free connection access.
+
+
+## Aircraft rendering and received resolution
+
+Aircraft markers are retained across refreshes and selection changes. New received airborne fixes interpolate on the browser animation clock for at most 20 seconds, including shortest-direction heading changes. The marker stops at the latest received fix: there is no future projection or synthetic route capture. Ground transitions, unknown flight status, reports older than three minutes, gaps over six minutes and implausible jumps snap to the received position. Reduced-motion preferences and paused updates disable interpolation. Hidden-tab catch-up settles at the received endpoint. Vessels retain their existing motion-colour rules.
+
+Flight-track lines render every stored received vertex without Leaflet simplification. The selected track refreshes when a new shared aircraft snapshot arrives as well as on its existing timer. Upstream request counts, aircraft key tiers, shared leases, free daily limits and route-write budgets are unchanged. The configured anonymous adsb.lol key permits 500 requests/day; the application retains its 480/day safety cap and 180-second target. Animation improves transitions; it does not provide second-by-second observations. An approved free adhoc key retains the existing 900/day cap and 95-second target.

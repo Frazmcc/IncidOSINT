@@ -1,7 +1,7 @@
 "use client";
 import {useEffect,useState} from "react";
 
-export function useFlightTrack(hex:string|null,paused:boolean) {
+export function useFlightTrack(hex:string|null,paused:boolean,sourceRevision:number|null=null) {
  const [data,setData]=useState<any>(null),[error,setError]=useState(""),[loading,setLoading]=useState(false);
  useEffect(()=>{
   let active=true,busy=false;const controller=new AbortController();
@@ -15,7 +15,7 @@ export function useFlightTrack(hex:string|null,paused:boolean) {
   }
   void run();const timer=paused?undefined:setInterval(()=>void run(),30_000);
   return()=>{active=false;controller.abort();if(timer)clearInterval(timer);};
- },[hex,paused]);
+ },[hex,paused,sourceRevision]);
  return {data:data?.identifier===hex?data:null,error,loading};
 }
 
