@@ -41,7 +41,7 @@ export async function POST(request:Request){
     const received=normalizeAircraft(await response.json(),aircraft);
     const encrypted=await encryptAircraftKey(body.apiKey,env.AIRCRAFT_KEY_SECRET,body.tier);
     const previous=await db.prepare("SELECT snapshot FROM feed_state WHERE id='aircraft-adsblol'").first<{snapshot:string}>();
-    const snapshot=mergeAircraftSnapshots(received,JSON.parse(previous?.snapshot||'{"records":[]}'));
+    const snapshot=mergeAircraftSnapshots(received,JSON.parse(previous?.snapshot||'{"records":[]}'),Date.now(),aircraft);
     const time=Date.now();
     await db.batch([
       db.prepare("INSERT INTO feed_state(id,snapshot,fetched_at) VALUES('aircraft-api-key',?,?) ON CONFLICT(id) DO UPDATE SET snapshot=excluded.snapshot,fetched_at=excluded.fetched_at").bind(JSON.stringify(encrypted),time),

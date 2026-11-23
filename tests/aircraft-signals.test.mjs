@@ -14,7 +14,7 @@ test("four-digit octal squawks preserve leading zeroes and reject malformed valu
   const r=normalized(raw).records[0];assert.equal(r.squawk,"0032");assert.equal(r.squawkObservedAt,now-1000);assert.equal(r.observedAt,now-5000);
 });
 
-test("recent UK SAR and police codes use red/blue; medical aircraft always use three colours",()=>{
+test("recent UK SAR and police codes use red/blue; medical aircraft use three colours except on the ground",()=>{
   const r=normalized(raw).records[0];
   assert.equal(aircraftLightPattern(r,now),"red-blue");
   assert.equal(aircraftLightPattern({...r,category:"Coastguard",squawk:"0023"},now),"red-blue");

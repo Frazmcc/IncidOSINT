@@ -38,10 +38,14 @@ Training, routine work and repositioning can produce these observations. Inferre
 
 ## Map and alerts
 
-The Reports & activity section separates public reports from detected activity, displays source/status/attribution details, and includes map-pin and in-app alert controls. Both controls are saved in browser-local preferences. In-app alerts are on by default, suppress the initial history load and old events, and do not use push, SMS, email or a paid messaging service. The existing updates-pause control also pauses incident refresh in that browser. Closing or hiding the sidebar does not stop shared collection.
+The Reports & activity section separates public reports from detected activity, displays source/status/attribution details, and includes map-pin and in-app alert controls. Detected activity map pins expire 30 minutes after the original `eventAt`; refreshes and selection do not extend that time. Their reports remain in the 24-hour list. Public incident pins keep the existing 24-hour retention. Expiry uses the browser clock and is checked every ten seconds, including while feed updates are paused. Selecting an expired activity opens its detail without restoring the pin or moving the map to it. Both controls are saved in browser-local preferences. In-app alerts are on by default, suppress the initial history load and old events, and do not use push, SMS, email or a paid messaging service. The existing updates-pause control also pauses incident refresh in that browser. Closing or hiding the sidebar does not stop shared collection.
 
 ## Validation
 
 `tests/incidents.test.mjs` covers timestamps, locations, XML limits, link preservation, 24-hour retention and balanced detection. `tests/incident-store.test.mjs` exercises the real Worker/D1 API: shared source leases under concurrent viewers, source and write caps, stale entries, redirect protection, retry behaviour and credential isolation. Existing aircraft, vessel, collector and encryption tests continue to apply.
 
 Source policy review: 22 November 2026. Recheck provider terms before changing enabled sources or widening their use.
+
+## Ground aircraft positions
+
+The latest received position is retained indefinitely when ADS-B explicitly reports `alt_baro: "ground"`. These aircraft use a grey symbol with no emergency-light animation; the details show flight status at report and the original position age. A base or landing site is never guessed from watchlist membership, speed, altitude zero, or reception loss. Previously discarded positions cannot be reconstructed by this change. Airborne and unknown-status positions still expire after 15 minutes. A newer positioned observation replaces the ground record; an explicit fresh airborne signal without usable coordinates removes the old ground pin without inventing a new one. Ground retention is bounded to the existing watchlist and rejects conflicting or removed registrations. It uses the existing snapshot and poll budget, with no additional upstream requests or database migration.

@@ -25,7 +25,7 @@ const readFeed = (db:D1Database,id:string) => db.prepare("SELECT * FROM feed_sta
 export async function recordAircraftPayload(payload:unknown,provider="adsblol"){
   const db=await ensureFeed(`aircraft-${provider}`),received=normalizeAircraft(payload,aircraft);
   const previous=await readFeed(db,`aircraft-${provider}`),prior=JSON.parse(previous?.snapshot||EMPTY);
-  const result=mergeAircraftSnapshots(received,prior);
+  const result=mergeAircraftSnapshots(received,prior,Date.now(),aircraft);
   await db.prepare("UPDATE feed_state SET snapshot=?,fetched_at=?,blocked_until=0,last_error=NULL WHERE id=?").bind(JSON.stringify(result),Date.now(),`aircraft-${provider}`).run();
   try{await captureAircraftTrails([...(prior.records||[]),...received.records]);}catch{console.warn("Aircraft trail capture temporarily unavailable");}
   try{await captureAssetActivity(db,received.records);}catch{console.warn("Aircraft activity capture temporarily unavailable");}
@@ -59,12 +59,13 @@ export async function aircraftSnapshot() {
     }
   }
   const row = await readFeed(db,id);
-  const result = JSON.parse(row?.snapshot || EMPTY);
+  const saved=JSON.parse(row?.snapshot || EMPTY);
+  const result={...saved,records:mergeAircraftSnapshots({records:[],rejected:[]},saved,now,aircraft).records};
   const quotaReset=row&&row.requests>=policy.limit?row.window_start+DAY_MS:0;
   const nextPollAt=Math.max(row?.next_poll_at||0,row?.blocked_until||0,quotaReset)||null;
   const rateLimited=Boolean(row?.last_error?.includes("HTTP 429"));
   const workerStale=Boolean(heartbeat&&now-heartbeat.fetched_at>180_000);
-  return { ...result, records:(result.records||[]).filter((r:any)=>now-r.observedAt<=900_000),unpositioned:(result.unpositioned||[]).filter((r:any)=>now-r.lastSeenAt<=120_000),fetchedAt:row?.fetched_at || null, nextPollAt,
+  return { ...result, unpositioned:(result.unpositioned||[]).filter((r:any)=>now-r.lastSeenAt<=120_000),fetchedAt:row?.fetched_at || null, nextPollAt,
     provider:policy.name, licence:policy.licence, intervalSeconds:policy.intervalMs / 1000,
     requestsUsed:row?.requests || 0, requestLimit:policy.limit,keyConfigured:Boolean(key),collectionMode:heartbeat?"background":"on-demand",workerLastSeenAt:heartbeat?.fetched_at||null,
     apiKeyConfigured:Boolean(key),keyTier:storedKey?.tier||(key?"adhoc":null),rateLimited,
