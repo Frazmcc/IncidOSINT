@@ -72,7 +72,7 @@ The Reports & activity layer now combines the free, reusable Traffic Wales and T
 
 One shared source reservation prevents visitors from multiplying upstream calls. Browser checks target 30 seconds; the two RSS feeds publish about every five minutes. Each source is capped at 288 requests per rolling daily window. Activity/event writes have a 6,000-reservation daily cap. Existing authenticated collector check-ins schedule source refresh without delaying aircraft leases, so the current external collector does not need redeployment.
 
-RNLI launches remain disabled pending written reuse permission. Traffic Scotland and National Highways await the relevant free access/approval; fire and Coastguard sites are links until a permitted automated feed is verified. No accounts, subscriptions or paid services are created. The source panel shows these states explicitly. Read [the incident-layer guide](docs/INCIDENTS.md) for source policies, limits, detection rules and validation.
+RNLI published launches use the embedded map data, with project-specific permission reported by the owner. Station coordinates are not emergency locations. Traffic Scotland and National Highways await the relevant free access/approval; fire and Coastguard sites are links until a permitted automated feed is verified. No accounts, subscriptions or paid services are created. The source panel shows these states explicitly. Read [the incident-layer guide](docs/INCIDENTS.md) for source policies, limits, detection rules and validation.
 
 ### Road and winter map views
 

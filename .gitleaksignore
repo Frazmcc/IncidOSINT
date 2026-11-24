@@ -1,0 +1,2 @@
+# Historical encryption test fixture only; no production secret, no rule-wide exclusion.
+124a4455059166d8b71570918dfc62a9bed108a0:tests/marine-history.test.mjs:generic-api-key:32

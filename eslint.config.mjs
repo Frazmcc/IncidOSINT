@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     ".sites-runtime/**",
     "outputs/**",
     "work/**",
+    // Upstream minified Leaflet distribution: scan for vulnerabilities separately; do not lint vendor internals.
+    "public/vendor/leaflet/leaflet.js",
   ]),
   {
     files: ["components/ui/**/*.{ts,tsx}", "hooks/use-mobile.ts"],

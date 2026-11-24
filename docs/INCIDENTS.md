@@ -11,9 +11,10 @@ This layer has no paid API, account creation, geocoder, external notification se
 
 Traffic Wales and DfI Traffic Information and Control Centre are credited on reports. Provider links are retained; no logos, camera images or third-party map data are copied. Network errors, redirects and provider limits pause a source. Retry-After is respected. Free source availability is not guaranteed. This first release does not provide complete UK/Ireland road-incident coverage.
 
+RNLI published launch records are extracted from the public launch page using HTMLRewriter, with project-specific permission reported by the owner. The shared cap is 288 requests per day (five-minute interval). Station coordinates are labelled as such; no vessel position or emergency location is inferred. No photographs or API keys are reused.
+
 ## Sources left disabled
 
-- RNLI: its [website terms, section 7](https://rnli.org/footer/terms-and-conditions), require written permission for republication beyond their permitted personal uses. The public pager web service is not called.
 - Traffic Scotland DATEX II: registration and approval required through the official developer hub.
 - National Highways: the appropriate free registration/licence has not been connected.
 - London Fire Brigade, Scottish Fire and Rescue, HM Coastguard: source links are provided; permitted automated live feeds have not been verified. Public statements are not treated as complete live dispatch feeds.
