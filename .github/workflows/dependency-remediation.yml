@@ -19,7 +19,7 @@ jobs:
       - name: Generate candidate lockfile
         run: |
           npm pkg set dependencies.next=16.4.6 dependencies.react=19.3.1 dependencies.react-dom=19.3.1 dependencies.zod=4.6.7
-          npm pkg set devDependencies.react-server-dom-webpack=19.3.1 devDependencies.eslint-config-next=16.4.6 devDependencies.vinext=1.4.6 devDependencies.vite=8.3.8 devDependencies.@cloudflare/vite-plugin=1.70.1
+          npm pkg set devDependencies.react-server-dom-webpack=19.3.1 devDependencies.eslint-config-next=16.4.6 devDependencies.@vitejs/plugin-rsc=0.5.39 devDependencies.vinext=1.4.6 devDependencies.vite=8.3.8 devDependencies.@cloudflare/vite-plugin=1.70.1
           npm pkg set 'overrides.miniflare.sharp=0.35.5'
           npm install --package-lock-only --ignore-scripts --no-audit
           npm audit fix --package-lock-only --ignore-scripts
