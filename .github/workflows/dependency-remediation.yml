@@ -1,0 +1,42 @@
+name: Dependency remediation candidate
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/dependency-remediation.yml'
+permissions:
+  contents: read
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate candidate lockfile
+        run: |
+          npm pkg set dependencies.next=16.4.6 dependencies.react=19.3.1 dependencies.react-dom=19.3.1 dependencies.zod=4.6.7
+          npm pkg set devDependencies.react-server-dom-webpack=19.3.1 devDependencies.eslint-config-next=16.4.6 devDependencies.vinext=1.4.6 devDependencies.vite=8.3.8 devDependencies.@cloudflare/vite-plugin=1.70.1
+          npm pkg set 'overrides.miniflare.sharp=0.35.5'
+          npm install --package-lock-only --ignore-scripts --no-audit
+          npm audit fix --package-lock-only --ignore-scripts
+      - name: Preserve candidate manifests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-candidate
+          path: |
+            package.json
+            package-lock.json
+          retention-days: 3
+      - name: Validate candidate
+        if: success()
+        run: |
+          npm ci
+          npm audit --audit-level=low
+          npx --no-install tsc --noEmit
+          node --test tests/*.test.mjs
+          npm run build
