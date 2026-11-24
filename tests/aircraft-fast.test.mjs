@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import {build} from "esbuild";
-import {Miniflare} from "miniflare";
+import {Miniflare} from "./helpers/miniflare.mjs";
 import {createFastCollector} from "../collector/render-aircraft.mjs";
 import {fastProviderUrl,compactAircraftPayload,FAST_POLL_MS,FAST_BATCH_REQUESTS} from "../lib/aircraft-fast-policy.mjs";
 import {blendAircraftLive} from "../lib/aircraft-live-view.mjs";

@@ -4,10 +4,12 @@ import {pollSharedAircraft} from "../aircraft-poll.mjs";
 import ids from "./mmsis.json";
 import {fetchWithoutRedirect} from "../../lib/edge-fetch.mjs";
 const idSet=new Set(ids);
-export default {async fetch(request,env){
+const collectorWorker = {async fetch(request,env){
  if(!env.VESSEL_INGEST_TOKEN||request.headers.get("Authorization")!==`Bearer ${env.VESSEL_INGEST_TOKEN}`)return new Response("Unauthorized",{status:401});
  return env.AIS_COLLECTOR.get(env.AIS_COLLECTOR.idFromName("uk-ireland-shared-rescue-ais")).fetch(request);
 }};
+export default collectorWorker;
+
 export class RescueAIS extends DurableObject {
  constructor(ctx,env){
   super(ctx,env);this.ctx=ctx;this.env=env;this.positions=new Map();this.channels=new Map();this.retry=new Map();this.failures=new Map();this.confirmations=new Map();this.active=false;this.aisRejected=false;this.error=null;this.lastPublishedAt=null;this.day=new Date().toISOString().slice(0,10);this.messages=0;

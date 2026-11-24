@@ -1,3 +1,4 @@
+import type {Track} from "./tracking-types";
 import { env } from "cloudflare:workers";
 import aircraft from "../data/aircraft.json";
 import vessels from "../data/vessels.json";
@@ -26,7 +27,7 @@ async function ensureFeed(id:string) {
 }
 const readFeed = (db:D1Database,id:string) => db.prepare("SELECT * FROM feed_state WHERE id = ?").bind(id).first<FeedRow>();
 
-export async function recordAircraftPayload(payload:unknown,provider="adsblol",history:any[]=[]){
+export async function recordAircraftPayload(payload:unknown,provider="adsblol",history:unknown[]=[]){
   const db=await ensureFeed(`aircraft-${provider}`),received=normalizeAircraft(payload,aircraft);
   received.records=received.records.map(r=>({...r,feedProvider:provider==="adsbfi"?"adsb.fi":"adsb.lol"}));
   const previous=await readFeed(db,`aircraft-${provider}`),prior=JSON.parse(previous?.snapshot||EMPTY);
@@ -35,9 +36,9 @@ export async function recordAircraftPayload(payload:unknown,provider="adsblol",h
   const result=mergeAircraftSnapshots(received,prior,Date.now(),aircraft);
   await db.prepare("UPDATE feed_state SET snapshot=?,fetched_at=?,blocked_until=0,last_error=NULL WHERE id=?").bind(JSON.stringify(result),Date.now(),`aircraft-${provider}`).run();
   const before=combineAircraftSnapshots([prior,otherSaved],Date.now(),aircraft),combined=combineAircraftSnapshots([result,otherSaved],Date.now(),aircraft);
-  const trusted=received.records.filter(r=>combined.records.some((c:any)=>c.id===r.id&&c.observedAt===r.observedAt&&c.lat===r.lat&&c.lon===r.lon));
-  const firstHistory=history.length?Math.min(...history.map(r=>Number(r?.observedAt)||0)):0;
-  const safeHistory=trustedAircraftHistory(history,before.records.filter((r:any)=>r.observedAt<firstHistory),Date.now(),aircraft);
+  const trusted=received.records.filter(r=>combined.records.some((c:Track)=>c.id===r.id&&c.observedAt===r.observedAt&&c.lat===r.lat&&c.lon===r.lon));
+  const firstHistory=history.length?Math.min(...history.map(r=>r&&typeof r==="object"&&"observedAt" in r?Number(r.observedAt)||0:0)):0;
+  const safeHistory=trustedAircraftHistory(history,before.records.filter((r:Track)=>r.observedAt<firstHistory),Date.now(),aircraft);
   try{await captureAircraftTrails([...(before.records||[]),...safeHistory,...trusted]);}catch{console.warn("Aircraft trail capture temporarily unavailable");}
   try{await captureAssetActivity(db,trusted);}catch{console.warn("Aircraft activity capture temporarily unavailable");}
   return result;
@@ -103,7 +104,7 @@ export async function aircraftSnapshot() {
   const rateLimited=Boolean(row?.last_error?.includes("HTTP 429"));
   const workerStale=Boolean(heartbeat&&now-heartbeat.fetched_at>180_000);
   const sourceStatus=(state:FeedRow|null,interval:number)=>state?.last_error?"paused":!state?.fetched_at?"waiting":workerStale||now-state.fetched_at>Math.max(180_000,interval*2)?"paused":"receiving";
-  return { ...result, unpositioned:(result.unpositioned||[]).filter((r:any)=>now-r.lastSeenAt<=120_000),fetchedAt:Math.max(row?.fetched_at||0,extra?.fetched_at||0)||null, nextPollAt,
+  return { ...result, unpositioned:(result.unpositioned||[]).filter((r:{lastSeenAt:number})=>now-r.lastSeenAt<=120_000),fetchedAt:Math.max(row?.fetched_at||0,extra?.fetched_at||0)||null, nextPollAt,
     provider:hasSupplementary?"adsb.lol + adsb.fi":policy.name, licence:hasSupplementary?"ODbL 1.0; adsb.fi personal non-commercial terms":policy.licence, intervalSeconds:supplementaryFresh?(fast?FAST_POLL_MS/1000:30):Math.ceil(budget.intervalMs / 1000),
     sources:[{name:"adsb.lol",fetchedAt:row?.fetched_at||null,status:sourceStatus(row,policy.intervalMs),message:row?.last_error||"",requestsUsed:budget.used,requestLimit:policy.limit,requestsRemaining:budget.remaining,quotaResetAt:budget.resetAt,nextPollAt:primaryNext},{name:"adsb.fi",fetchedAt:extra?.fetched_at||null,status:sourceStatus(extra,30_000),message:extra?.last_error||"",requestsUsed:fast?(now-fast.window_start<DAY_MS?fast.requests*FAST_BATCH_REQUESTS:0):extra?.requests||0,requestLimit:fast?FAST_DAILY_REQUESTS:2880}],
     requestsUsed:budget.used, requestsRemaining:budget.remaining,quotaResetAt:budget.resetAt,requestLimit:policy.limit,keyConfigured:Boolean(key),collectionMode:heartbeat?"background":"on-demand",workerLastSeenAt:heartbeat?.fetched_at||null,
@@ -119,7 +120,7 @@ export async function vesselSnapshot() {
   const configured = Boolean(runtimeEnv().VESSEL_INGEST_TOKEN);
   const stale = !row?.fetched_at || Date.now() - row.fetched_at > 120_000;
   const records=mergeVesselSnapshots([],result,vessels.records);
-  const freshCount=records.filter((r:any)=>Date.now()-r.observedAt<=180_000).length;
+  const freshCount=records.filter((r:Track)=>Date.now()-r.observedAt<=180_000).length;
   return { ...result, records,freshCount,lastKnownCount:records.length-freshCount,registeredCount:vessels.records.length,awaitingFirstPosition:vessels.records.length-records.length,fetchedAt:row?.fetched_at || null, provider:"AISStream", intervalSeconds:30,
     status:!configured ? "setup_required" : stale ? "waiting" : "receiving",
     message:!configured ? "Live boat positions await the shared AISStream collector." : stale ? "Waiting for the shared AIS collector. Saved vessel positions remain visible with their original report times." : "" };

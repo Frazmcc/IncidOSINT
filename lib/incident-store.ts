@@ -1,3 +1,4 @@
+import type {Track,IncidentEvent} from "./tracking-types";
 import {INCIDENT_SOURCES,INCIDENT_RETENTION_MS,INCIDENT_WRITE_LIMIT} from "./incident-sources.mjs";
 import {detectAssetActivity,mergeIncidentEvents,parseIncidentFeed} from "./incident-core.mjs";
 import {RESERVE_POLL_SQL,DAY_MS} from "./tracking-core.mjs";
@@ -14,7 +15,7 @@ async function writeSlot(db:D1Database,now:number){
  return Boolean(await db.prepare(`UPDATE feed_state SET window_start=CASE WHEN window_start<=?1 THEN ?2 ELSE window_start END,requests=CASE WHEN window_start<=?1 THEN 1 ELSE requests+1 END WHERE id='incident-write-budget' AND (window_start<=?1 OR requests<?3) RETURNING id`).bind(now-DAY_MS,now,INCIDENT_WRITE_LIMIT).first());
 }
 
-export async function saveIncidentEvents(db:D1Database,incoming:any[],now=Date.now()){
+export async function saveIncidentEvents(db:D1Database,incoming:IncidentEvent[],now=Date.now()){
  if(!incoming.length)return;
  await ensure(db,"incident-events");
  for(let attempt=0;attempt<4;attempt++){
@@ -27,7 +28,7 @@ export async function saveIncidentEvents(db:D1Database,incoming:any[],now=Date.n
  throw Error("Concurrent incident update; the shared collector will retry.");
 }
 
-export async function captureAssetActivity(db:D1Database,records:any[],now=Date.now()){
+export async function captureAssetActivity(db:D1Database,records:Track[],now=Date.now()){
  if(!records.length)return;
  const kind=records[0].kind;if(!["aircraft","vessel"].includes(kind))return;
  const id=`incident-${kind}-state`;await ensure(db,id);

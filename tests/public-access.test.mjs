@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {build} from "esbuild";
-import {Miniflare} from "miniflare";
+import {Miniflare} from "./helpers/miniflare.mjs";
 import {ownerAllowed,setupRequestAllowed,PUBLIC_SITE_ORIGIN,HOSTED_SITE_ORIGIN,securityHeaders} from "../lib/site-security.mjs";
 
 test("owner access fails closed for missing configuration, anonymous visitors and other signed-in accounts",()=>{
@@ -44,7 +44,7 @@ test("real setup pages and APIs protect owner controls while collector endpoints
   });
   let upstream=0;
   for(const identity of [null,{userId:"visitor",email:"visitor@example.test"},{userId:"owner",email:"owner@example.test"}]){
-    const mf=new Miniflare({modules:true,script:compiled.outputFiles[0].text,compatibilityDate:"2026-05-22",d1Databases:{DB:"public-access-test"},bindings:{
+    const mf=new Miniflare({modules:true,script:compiled.outputFiles[0].text,compatibilityDate:"2026-05-22",compatibilityFlags:["nodejs_compat"],d1Databases:{DB:"public-access-test"},bindings:{
       TEST_IDENTITY:identity?JSON.stringify(identity):"",COLLECTOR_OWNER_EMAIL:"owner@example.test",
       VESSEL_INGEST_TOKEN:"synthetic-private-ingest-token-long-enough",SITE_SERVICE_TOKEN:"synthetic-private-service-token",
       AIRCRAFT_KEY_SECRET:"synthetic-encryption-secret-long-enough",MAPTILER_BROWSER_KEY:"public-browser-key",
@@ -59,6 +59,12 @@ test("real setup pages and APIs protect owner controls while collector endpoints
         for(const origin of [PUBLIC_SITE_ORIGIN,"https://attacker.test"]){
           const response=await mf.dispatchFetch(`https://site.test/${route}`,{method:"POST",headers:{Origin:origin,"Content-Type":"application/json"},body:"{}"});
           assert.equal(response.status,isOwner&&origin===PUBLIC_SITE_ORIGIN?400:403);
+        }
+      }
+      if(isOwner)for(const route of ["aircraft","cloudflare"]){
+        for(const body of ["null","[]","42",'{"action":{}}']){
+          const response=await mf.dispatchFetch(`https://site.test/${route}`,{method:"POST",headers:{Origin:PUBLIC_SITE_ORIGIN,"Content-Type":"application/json"},body});
+          assert.equal(response.status,400,`${route} must reject malformed setup objects without a provider call`);
         }
       }
       for(const [route,method] of [["ingest","POST"],["collector","POST"],["status","GET"]]){

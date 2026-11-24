@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {build} from "esbuild";
-import {Miniflare} from "miniflare";
+import {Miniflare} from "./helpers/miniflare.mjs";
 import {readFile,readdir} from "node:fs/promises";
 
 test("the real aircraft API preserves old ground reports across empty collector polls and replaces them on take-off",async()=>{

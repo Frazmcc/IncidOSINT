@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {Miniflare,WebSocketPair,Response as WorkerResponse} from 'miniflare';
+import {Miniflare,WebSocketPair,Response as WorkerResponse} from './helpers/miniflare.mjs';
 
 test('The actual shared worker subscribes once per MMSI chunk, decodes binary AIS frames and forwards vessel positions without a map viewer',async()=>{
  const bundle=JSON.parse(await readFile(new URL('../data/collector-bundle.json',import.meta.url)));

@@ -1,16 +1,17 @@
 "use client";
 import {useEffect,useState} from "react";
+import type {VesselHistory} from "../lib/tracking-types";
 import {VESSEL_HISTORY_DEFAULT_HOURS,VESSEL_HISTORY_HOURS} from "../lib/vessel-trails.mjs";
 import {vesselRouteView} from "../lib/vessel-route-view.mjs";
 
 export function useVesselTrack(mmsi:string|null, hours:number, paused:boolean) {
- const [data,setData]=useState<any>(null),[error,setError]=useState(""),[loading,setLoading]=useState(false);
+ const [data,setData]=useState<VesselHistory|null>(null),[error,setError]=useState(""),[loading,setLoading]=useState(false);
  useEffect(()=>{
-  let active=true,busy=false; const controller=new AbortController(); setError(""); setLoading(false);
+  let active=true,busy=false; const controller=new AbortController();
   if(!mmsi)return()=>{active=false;controller.abort();};
   async function run(){
-   if(busy||document.visibilityState==="hidden")return;busy=true;if(active)setLoading(true);
-   try{const response=await fetch(`/api/tracks/vessels/${mmsi}?hours=${hours}`,{signal:controller.signal});const value:any=await response.json();if(!response.ok)throw Error(value.error||"Vessel history is unavailable.");if(active){setData(value);setError("");}}
+   if(busy||document.visibilityState==="hidden")return;busy=true;if(active){setLoading(true);setError("");}
+   try{const response=await fetch(`/api/tracks/vessels/${mmsi}?hours=${hours}`,{signal:controller.signal});const value:VesselHistory=await response.json();if(!response.ok)throw Error(value.error||"Vessel history is unavailable.");if(active){setData(value);setError("");}}
    catch(e){if(active&&!controller.signal.aborted)setError(e instanceof Error?e.message:"Vessel history is unavailable.");}
    finally{busy=false;if(active)setLoading(false);}
   }
@@ -18,10 +19,10 @@ export function useVesselTrack(mmsi:string|null, hours:number, paused:boolean) {
   const resume=()=>{if(!paused)void run();};document.addEventListener("visibilitychange",resume);
   return()=>{active=false;controller.abort();if(timer)clearInterval(timer);document.removeEventListener("visibilitychange",resume);};
  },[mmsi,hours,paused]);
- return {data:data?.identifier===mmsi&&data?.hours===hours?data:null,error,loading};
+ return {data:data?.identifier===mmsi&&data?.hours===hours?data:null,error:mmsi?error:"",loading:Boolean(mmsi)&&loading};
 }
-const clock=(at:number)=>new Date(at).toLocaleString("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"Europe/London"});
-export function VesselTrackPanel({data,error,loading,hours,onHoursChange,visible,onToggle,onFit}:{data:any;error:string;loading:boolean;hours:number;onHoursChange:(hours:number)=>void;visible:boolean;onToggle:()=>void;onFit:()=>void}) {
+const clock=(at:number|null)=>at===null?"Not recorded":new Date(at).toLocaleString("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"Europe/London"});
+export function VesselTrackPanel({data,error,loading,hours,onHoursChange,visible,onToggle,onFit}:{data:VesselHistory|null;error:string;loading:boolean;hours:number;onHoursChange:(hours:number)=>void;visible:boolean;onToggle:()=>void;onFit:()=>void}) {
  const view=vesselRouteView(data);
  return <section className="flight-track-panel vessel-track-panel" aria-label="Selected vessel AIS history">
   <div className="flight-track-heading"><label><input type="checkbox" checked={visible} onChange={onToggle}/>Vessel track</label><button onClick={onFit} disabled={!data?.points?.length}>Fit track</button></div>

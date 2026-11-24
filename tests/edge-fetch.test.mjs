@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
-import {Miniflare} from "miniflare";
+import {Miniflare} from "./helpers/miniflare.mjs";
 
 test("Workers accepts authenticated setup requests and blocks every redirect without forwarding credentials", async()=>{
   const helper=await readFile(new URL("../lib/edge-fetch.mjs",import.meta.url),"utf8");

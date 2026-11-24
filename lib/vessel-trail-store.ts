@@ -1,3 +1,4 @@
+import type {Track} from "./tracking-types";
 import { env } from "cloudflare:workers";
 import { DAY_MS, RESERVE_POLL_SQL } from "./tracking-core.mjs";
 import { groupVesselTrailRecords, mergeVesselTrailWindow, selectedVesselTrail, vesselHistoryHours, vesselWindowStart, VESSEL_HISTORY_CAPTURE_LIMIT, VESSEL_HISTORY_MAX_BYTES, VESSEL_HISTORY_RETENTION_MS, VESSEL_HISTORY_SAMPLE_MS, VESSEL_HISTORY_WINDOW_MS } from "./vessel-trails.mjs";
@@ -5,7 +6,7 @@ import { groupVesselTrailRecords, mergeVesselTrailWindow, selectedVesselTrail, v
 const STATE = "vessel-trails";
 const database = () => (env as Cloudflare.Env).DB;
 
-export async function captureVesselTrails(records:any[], now = Date.now()) {
+export async function captureVesselTrails(records:Track[], now = Date.now()) {
   const db = database(); if (!db) throw Error("Vessel history storage unavailable");
   await db.prepare("INSERT INTO feed_state(id,snapshot) VALUES(?,?) ON CONFLICT(id) DO NOTHING").bind(STATE, JSON.stringify({ startedAt: now })).run();
   const reserved = await db.prepare(RESERVE_POLL_SQL).bind(now + VESSEL_HISTORY_SAMPLE_MS, now - DAY_MS, now, STATE, VESSEL_HISTORY_CAPTURE_LIMIT).first();

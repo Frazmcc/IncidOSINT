@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request:Request) {
   try {
-    const cache=(globalThis as any).caches?.default;
+    const cache=(globalThis.caches as CacheStorage & {default?: Cache})?.default;
     const cacheKey=new Request(new URL("/api/live",request.url));
     let cached=null;try{if(cache)cached=await cache.match(cacheKey);}catch{}
     if(cached)return cached;
