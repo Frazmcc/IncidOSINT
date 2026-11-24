@@ -3,6 +3,7 @@ import aircraft from "../data/aircraft.json";
 import vessels from "../data/vessels.json";
 import { aircraftPolicy, DAY_MS, normalizeAircraft, normalizeVessels, mergeAircraftSnapshots, mergeVesselSnapshots, RESERVE_POLL_SQL, retryDelay } from "./tracking-core.mjs";
 import { captureAircraftTrails } from "./trail-store";
+import { captureVesselTrails } from "./vessel-trail-store";
 import { readAircraftKey } from "./aircraft-key.mjs";
 import { fetchWithoutRedirect } from "./edge-fetch.mjs";
 import {captureAssetActivity} from "./incident-store";
@@ -99,6 +100,7 @@ export async function ingestVessels(input:unknown) {
     if(write.meta.changes){saved=true;break;}
   }
   if(!saved)throw new Error("A concurrent vessel update is in progress; the collector will retry.");
+  try{await captureVesselTrails(records);}catch{console.warn("Vessel history capture temporarily unavailable");}
   try{await captureAssetActivity(db,records);}catch{console.warn("Vessel activity capture temporarily unavailable");}
   return records.length;
 }

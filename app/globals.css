@@ -78,3 +78,5 @@
 .track-marker.track-lifeboat-moving{filter:drop-shadow(0 1px 1px #071b2b) drop-shadow(0 0 3px #ff9b4380)}
 
 .owner-sign-in{display:inline-flex;text-decoration:none;align-items:center;justify-content:center;margin:14px 0}
+
+.vessel-history-period{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;font-size:14px;color:#365f7d}.vessel-history-period select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23365f7d' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;min-height:38px;min-width:115px;border:1px solid #c2d4e2;border-radius:4px;padding:5px 30px 5px 8px;background-color:#f4f8fb;color:#254c67;font-size:16px}.vessel-track-panel dl{font-size:14px}.vessel-track-panel .track-explanation{font-size:13px}

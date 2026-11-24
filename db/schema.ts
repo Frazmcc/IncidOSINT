@@ -22,3 +22,9 @@ export const trailBudget=sqliteTable("trail_budget",{
   windowStart:integer("window_start").notNull(),
   samples:integer("samples").notNull().default(0),
 });
+
+export const vesselTrailWindows=sqliteTable("vessel_trail_windows",{
+  windowStart:integer("window_start").primaryKey(),
+  payload:text("payload").notNull(),
+  updatedAt:integer("updated_at").notNull(),
+});
