@@ -29,7 +29,7 @@ test('Vessels remain at their last real position through empty snapshots and mon
  assert.deepEqual(mergeVesselSnapshots([],{},fleet,later),[]);
 });
 test('Stored free aircraft keys are encrypted with authenticated tier metadata, and anonymous keys keep the 500/day allowance margin',async()=>{
- const secret='synthetic-encryption-secret-1234567890',key='sk-lol-synthetic-key-for-tests';
+ const secret=crypto.randomUUID()+crypto.randomUUID(),key=crypto.randomUUID();
  const saved=await encryptAircraftKey(key,secret,'anonymous',now);
  assert.ok(!JSON.stringify(saved).includes(key));assert.deepEqual(await decryptAircraftKey(saved,secret),{value:key,tier:'anonymous',configuredAt:now});
  await assert.rejects(()=>decryptAircraftKey({...saved,tier:'adhoc'},secret));
