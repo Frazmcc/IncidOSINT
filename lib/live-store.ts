@@ -7,11 +7,13 @@ import { captureVesselTrails } from "./vessel-trail-store";
 import { readAircraftKey } from "./aircraft-key.mjs";
 import { fetchWithoutRedirect } from "./edge-fetch.mjs";
 import {captureAssetActivity} from "./incident-store";
-import {combineAircraftSnapshots} from "./aircraft-fusion.mjs";
+import {aircraftBudget,aircraftReservationArgs,RESERVE_AIRCRAFT_SQL} from "./aircraft-budget.mjs";
+import {FAST_POLL_MS,FAST_BATCH_REQUESTS,FAST_DAILY_REQUESTS,FAST_BUDGET_ID} from "./aircraft-fast-policy.mjs";
+import {combineAircraftSnapshots,trustedAircraftHistory} from "./aircraft-fusion.mjs";
 
 export const runtimeEnv = () => env as Cloudflare.Env & {
   ADSB_PROVIDER?: string; ADSB_LOL_FREE_KEY?: string; MAPTILER_BROWSER_KEY?: string;
-  VESSEL_INGEST_TOKEN?: string; AIRCRAFT_KEY_SECRET?:string; ADSB_FI_ENABLED?:string;
+  VESSEL_INGEST_TOKEN?: string; AIRCRAFT_KEY_SECRET?:string; ADSB_FI_ENABLED?:string; ADSB_FI_FAST_URL?:string; ADSB_FI_COLLECTOR_TOKEN?:string;
 };
 type FeedRow = { id:string; snapshot:string; fetched_at:number; next_poll_at:number; window_start:number; requests:number; blocked_until:number; last_error:string|null };
 const EMPTY = JSON.stringify({ records:[], rejected:[] });
@@ -24,7 +26,7 @@ async function ensureFeed(id:string) {
 }
 const readFeed = (db:D1Database,id:string) => db.prepare("SELECT * FROM feed_state WHERE id = ?").bind(id).first<FeedRow>();
 
-export async function recordAircraftPayload(payload:unknown,provider="adsblol"){
+export async function recordAircraftPayload(payload:unknown,provider="adsblol",history:any[]=[]){
   const db=await ensureFeed(`aircraft-${provider}`),received=normalizeAircraft(payload,aircraft);
   received.records=received.records.map(r=>({...r,feedProvider:provider==="adsbfi"?"adsb.fi":"adsb.lol"}));
   const previous=await readFeed(db,`aircraft-${provider}`),prior=JSON.parse(previous?.snapshot||EMPTY);
@@ -34,7 +36,9 @@ export async function recordAircraftPayload(payload:unknown,provider="adsblol"){
   await db.prepare("UPDATE feed_state SET snapshot=?,fetched_at=?,blocked_until=0,last_error=NULL WHERE id=?").bind(JSON.stringify(result),Date.now(),`aircraft-${provider}`).run();
   const before=combineAircraftSnapshots([prior,otherSaved],Date.now(),aircraft),combined=combineAircraftSnapshots([result,otherSaved],Date.now(),aircraft);
   const trusted=received.records.filter(r=>combined.records.some((c:any)=>c.id===r.id&&c.observedAt===r.observedAt&&c.lat===r.lat&&c.lon===r.lon));
-  try{await captureAircraftTrails([...(before.records||[]),...trusted]);}catch{console.warn("Aircraft trail capture temporarily unavailable");}
+  const firstHistory=history.length?Math.min(...history.map(r=>Number(r?.observedAt)||0)):0;
+  const safeHistory=trustedAircraftHistory(history,before.records.filter((r:any)=>r.observedAt<firstHistory),Date.now(),aircraft);
+  try{await captureAircraftTrails([...(before.records||[]),...safeHistory,...trusted]);}catch{console.warn("Aircraft trail capture temporarily unavailable");}
   try{await captureAssetActivity(db,trusted);}catch{console.warn("Aircraft activity capture temporarily unavailable");}
   return result;
 }
@@ -42,7 +46,7 @@ export async function recordAircraftPayload(payload:unknown,provider="adsblol"){
 // Called only by an authenticated collector check-in. Visitors read the shared
 // snapshots and cannot multiply upstream requests or override this allowance.
 export async function pollSupplementalAircraft(now=Date.now()) {
-  if(runtimeEnv().ADSB_FI_ENABLED==="false")return;
+  if(runtimeEnv().ADSB_FI_ENABLED==="false"||runtimeEnv().ADSB_FI_COLLECTOR_TOKEN)return;
   const policy=aircraftPolicy("adsbfi"),id="aircraft-adsbfi",db=await ensureFeed(id);
   const reserved=await db.prepare(RESERVE_POLL_SQL).bind(now+policy.intervalMs,now-DAY_MS,now,id,policy.limit).first();
   if(!reserved)return;
@@ -66,7 +70,7 @@ export async function aircraftSnapshot() {
   const db = await ensureFeed(id);
   const heartbeat=await readFeed(db,"aircraft-worker");
   const now = Date.now();
-  const acquired = heartbeat?null:await db.prepare(RESERVE_POLL_SQL).bind(now + policy.intervalMs, now - DAY_MS, now, id, policy.limit).first();
+  const acquired = heartbeat?null:await db.prepare(RESERVE_AIRCRAFT_SQL).bind(...aircraftReservationArgs(policy,now)).first();
   if (acquired) {
     try {
       const headers:Record<string,string> = { "User-Agent":"Logic-Emergency-Air-Sea/1.0 (+https://logic-uk-ireland-rescue-vessels.starrycapybara8.chatgpt.site/)" };
@@ -86,11 +90,13 @@ export async function aircraftSnapshot() {
   const row = await readFeed(db,id);
   const saved=JSON.parse(row?.snapshot || EMPTY);
   const extra=await readFeed(db,"aircraft-adsbfi"),extraSaved=JSON.parse(extra?.snapshot||EMPTY);
+  const fast=config.ADSB_FI_COLLECTOR_TOKEN?await readFeed(db,FAST_BUDGET_ID):null;
   const result=combineAircraftSnapshots([saved,extraSaved],now,aircraft);
   const supplementaryFresh=Boolean(extra?.fetched_at&&!extra.last_error&&now-extra.fetched_at<180_000);
   const hasSupplementary=Boolean(extra?.fetched_at);
-  const quotaReset=row&&row.requests>=policy.limit?row.window_start+DAY_MS:0;
-  const primaryNext=Math.max(row?.next_poll_at||0,row?.blocked_until||0,quotaReset);
+  const budget=aircraftBudget(policy,row,now);
+  const quotaReset=budget.remaining?0:budget.resetAt;
+  const primaryNext=budget.nextPollAt;
   const extraQuota=extra&&extra.requests>=2880?extra.window_start+DAY_MS:0;
   const extraNext=Math.max(extra?.next_poll_at||0,extra?.blocked_until||0,extraQuota);
   const nextPollAt=[primaryNext,extraNext].filter(t=>t>now).sort((a,b)=>a-b)[0]||null;
@@ -98,9 +104,9 @@ export async function aircraftSnapshot() {
   const workerStale=Boolean(heartbeat&&now-heartbeat.fetched_at>180_000);
   const sourceStatus=(state:FeedRow|null,interval:number)=>state?.last_error?"paused":!state?.fetched_at?"waiting":workerStale||now-state.fetched_at>Math.max(180_000,interval*2)?"paused":"receiving";
   return { ...result, unpositioned:(result.unpositioned||[]).filter((r:any)=>now-r.lastSeenAt<=120_000),fetchedAt:Math.max(row?.fetched_at||0,extra?.fetched_at||0)||null, nextPollAt,
-    provider:hasSupplementary?"adsb.lol + adsb.fi":policy.name, licence:hasSupplementary?"ODbL 1.0; adsb.fi personal non-commercial terms":policy.licence, intervalSeconds:supplementaryFresh?30:policy.intervalMs / 1000,
-    sources:[{name:"adsb.lol",fetchedAt:row?.fetched_at||null,status:sourceStatus(row,policy.intervalMs),message:row?.last_error||"",requestsUsed:row?.requests||0,requestLimit:policy.limit},{name:"adsb.fi",fetchedAt:extra?.fetched_at||null,status:sourceStatus(extra,30_000),message:extra?.last_error||"",requestsUsed:extra?.requests||0,requestLimit:2880}],
-    requestsUsed:row?.requests || 0, requestLimit:policy.limit,keyConfigured:Boolean(key),collectionMode:heartbeat?"background":"on-demand",workerLastSeenAt:heartbeat?.fetched_at||null,
+    provider:hasSupplementary?"adsb.lol + adsb.fi":policy.name, licence:hasSupplementary?"ODbL 1.0; adsb.fi personal non-commercial terms":policy.licence, intervalSeconds:supplementaryFresh?(fast?FAST_POLL_MS/1000:30):Math.ceil(budget.intervalMs / 1000),
+    sources:[{name:"adsb.lol",fetchedAt:row?.fetched_at||null,status:sourceStatus(row,policy.intervalMs),message:row?.last_error||"",requestsUsed:budget.used,requestLimit:policy.limit,requestsRemaining:budget.remaining,quotaResetAt:budget.resetAt,nextPollAt:primaryNext},{name:"adsb.fi",fetchedAt:extra?.fetched_at||null,status:sourceStatus(extra,30_000),message:extra?.last_error||"",requestsUsed:fast?(now-fast.window_start<DAY_MS?fast.requests*FAST_BATCH_REQUESTS:0):extra?.requests||0,requestLimit:fast?FAST_DAILY_REQUESTS:2880}],
+    requestsUsed:budget.used, requestsRemaining:budget.remaining,quotaResetAt:budget.resetAt,requestLimit:policy.limit,keyConfigured:Boolean(key),collectionMode:heartbeat?"background":"on-demand",workerLastSeenAt:heartbeat?.fetched_at||null,
     apiKeyConfigured:Boolean(key),keyTier:storedKey?.tier||(key?"adhoc":null),rateLimited,
     status:supplementaryFresh&&!workerStale?"receiving":row?.last_error||workerStale||quotaReset>now ? "paused" : row?.fetched_at ? "receiving" : "waiting",
     message:rateLimited?"adsb.lol is rate-limiting the aircraft feed (HTTP 429). Collection will retry automatically when the pause ends.":workerStale?"The background aircraft collector has not checked in recently. Saved flight tracks remain available.":quotaReset>now?"The shared aircraft feed has reached its free daily request budget.":row?.last_error || "", blockedUntil:row?.blocked_until || null };

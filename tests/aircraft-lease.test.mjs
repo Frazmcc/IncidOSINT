@@ -30,7 +30,7 @@ test('The real aircraft service API authenticates leases, shares its budget with
   }
   assert.equal(upstream,0);
   const budget=await db.prepare("SELECT requests FROM feed_state WHERE id='aircraft-adsblol'").first();assert.equal(budget.requests,1);
-  await db.prepare("UPDATE feed_state SET requests=900,next_poll_at=0 WHERE id='aircraft-adsblol'").run();
+  await db.prepare("UPDATE feed_state SET requests=990,next_poll_at=0 WHERE id='aircraft-adsblol'").run();
   assert.equal((await (await call({action:'lease'})).json()).acquired,false);
  }finally{await mf.dispose();}
 });

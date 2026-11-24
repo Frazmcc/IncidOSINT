@@ -34,7 +34,7 @@ test('Stored free aircraft keys are encrypted with authenticated tier metadata, 
  assert.ok(!JSON.stringify(saved).includes(key));assert.deepEqual(await decryptAircraftKey(saved,secret),{value:key,tier:'anonymous',configuredAt:now});
  await assert.rejects(()=>decryptAircraftKey({...saved,tier:'adhoc'},secret));
  await assert.rejects(()=>decryptAircraftKey(saved,secret+'wrong'));
- assert.equal(aircraftPolicy('adsblol',true,'anonymous').limit,480);
- assert.equal(aircraftPolicy('adsblol',true,'anonymous').intervalMs,180000);
- assert.equal(aircraftPolicy('adsblol',true,'adhoc').limit,900);
+ assert.equal(aircraftPolicy('adsblol',true,'anonymous').limit,495);
+ assert.equal(aircraftPolicy('adsblol',true,'anonymous').intervalMs,Math.ceil(86_400_000/495));
+ assert.equal(aircraftPolicy('adsblol',true,'adhoc').limit,990);
 });

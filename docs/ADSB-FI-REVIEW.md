@@ -59,3 +59,13 @@ allowance. Observed departure/landing transitions are prioritised; repeated
 idle ground reports are retained in live snapshots without repeated trail
 writes. Faster visual movement does not imply every animation frame is a
 received or stored position.
+
+## Subsequent collector update
+
+The hosted Worker test confirmed an upstream Cloudflare security block on
+24 November 2026. The full public query worked in the owner’s normal browser.
+The dedicated Render Free collector, durable permits, two-second shared cache,
+high-resolution history batches and enforced allowances are documented in
+[FAST-AIRCRAFT.md](FAST-AIRCRAFT.md). When its token is configured, the earlier
+Cloudflare supplementary polling path is disabled; its 30-second policy only
+applies to the legacy integration.

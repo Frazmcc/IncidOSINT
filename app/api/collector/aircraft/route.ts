@@ -1,6 +1,7 @@
 import {runtimeEnv,recordAircraftPayload,pollSupplementalAircraft} from "../../../../lib/live-store";
 import {readAircraftKey} from "../../../../lib/aircraft-key.mjs";
-import {aircraftPolicy,RESERVE_POLL_SQL,DAY_MS,retryDelay} from "../../../../lib/tracking-core.mjs";
+import {aircraftPolicy,retryDelay} from "../../../../lib/tracking-core.mjs";
+import {aircraftBudget,aircraftReservationArgs,RESERVE_AIRCRAFT_SQL} from "../../../../lib/aircraft-budget.mjs";
 import fleet from "../../../../data/aircraft.json";
 export const dynamic="force-dynamic";
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{"Cache-Control":"no-store, private"}});
@@ -18,15 +19,16 @@ export async function POST(request:Request){
     await db.prepare("INSERT INTO feed_state(id,snapshot) VALUES('aircraft-adsblol','{\"records\":[]}') ON CONFLICT(id) DO NOTHING").run();
     await db.prepare("INSERT INTO feed_state(id,snapshot,fetched_at) VALUES('aircraft-worker','{}',?) ON CONFLICT(id) DO UPDATE SET fetched_at=excluded.fetched_at").bind(now).run();
     try{await pollSupplementalAircraft(now);}catch{console.warn("Supplementary aircraft check-in could not finish");}
-    const reserved=await db.prepare(RESERVE_POLL_SQL).bind(now+policy.intervalMs,now-DAY_MS,now,"aircraft-adsblol",policy.limit).first();
+    const reserved=await db.prepare(RESERVE_AIRCRAFT_SQL).bind(...aircraftReservationArgs(policy,now)).first<{requests:number;next_poll_at:number;window_start:number}>();
     if(!reserved){
       const state=await db.prepare("SELECT next_poll_at,blocked_until,window_start,requests,last_error FROM feed_state WHERE id='aircraft-adsblol'").first<any>();
-      return json({acquired:false,nextPollAt:Math.max(state?.next_poll_at||0,state?.blocked_until||0,state?.requests>=policy.limit?state.window_start+DAY_MS:0),message:state?.last_error||"Waiting for the next shared poll.",requestsUsed:state?.requests||0,requestLimit:policy.limit});
+      const budget=aircraftBudget(policy,state,now);
+      return json({acquired:false,nextPollAt:budget.nextPollAt,message:state?.last_error||"Waiting for the next shared poll.",requestsUsed:budget.used,requestsRemaining:budget.remaining,quotaResetAt:budget.resetAt,requestLimit:policy.limit});
     }
     const pollId=crypto.randomUUID();
     await db.prepare("UPDATE feed_state SET snapshot=? WHERE id='aircraft-worker'").bind(JSON.stringify({pollId,issuedAt:now,keyRevision:stored?.configuredAt||0})).run();
     // Only the authenticated backend collector receives this temporary key.
-    return json({acquired:true,pollId,url:policy.url+fleet.map(r=>r.icao_hex).join(","),apiKey:key||null,intervalMs:policy.intervalMs,requestLimit:policy.limit});
+    return json({acquired:true,pollId,url:policy.url+fleet.map(r=>r.icao_hex).join(","),apiKey:key||null,intervalMs:Math.max(0,reserved.next_poll_at-now),requestLimit:policy.limit});
   }
   const row=await db.prepare("SELECT snapshot FROM feed_state WHERE id='aircraft-worker'").first<{snapshot:string}>();
   let lease:any;try{lease=JSON.parse(row?.snapshot||"{}");}catch{return json({error:"Invalid poll lease"},409);}

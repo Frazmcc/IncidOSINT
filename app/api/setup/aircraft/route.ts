@@ -1,7 +1,8 @@
 import { getChatGPTUser } from "../../../chatgpt-auth";
 import { runtimeEnv } from "../../../../lib/live-store";
 import { encryptAircraftKey, readAircraftKey } from "../../../../lib/aircraft-key.mjs";
-import { aircraftPolicy, normalizeAircraft, mergeAircraftSnapshots, retryDelay, DAY_MS } from "../../../../lib/tracking-core.mjs";
+import { aircraftPolicy, normalizeAircraft, mergeAircraftSnapshots, retryDelay } from "../../../../lib/tracking-core.mjs";
+import {aircraftBudget,aircraftReservationArgs,RESERVE_AIRCRAFT_SQL} from "../../../../lib/aircraft-budget.mjs";
 import { fetchWithoutRedirect } from "../../../../lib/edge-fetch.mjs";
 import {ownerAllowed,setupRequestAllowed} from "../../../../lib/site-security.mjs";
 import { captureAircraftTrails } from "../../../../lib/trail-store";
@@ -31,10 +32,20 @@ export async function POST(request:Request){
   if(!lease)return json({error:"A key check has already run recently. Wait three minutes before testing again."},429);
   try{
     const policy=aircraftPolicy("adsblol",true,body.tier);
+    const existing=await readAircraftKey(db,env.AIRCRAFT_KEY_SECRET);
+    const checkPolicy=aircraftPolicy("adsblol",true,existing?.tier==="anonymous"?"anonymous":body.tier);
+    await db.prepare("INSERT INTO feed_state(id,snapshot) VALUES('aircraft-adsblol','{\"records\":[]}') ON CONFLICT(id) DO NOTHING").run();
+    const reserved=await db.prepare(RESERVE_AIRCRAFT_SQL).bind(...aircraftReservationArgs(checkPolicy,Date.now(),true)).first();
+    if(!reserved){
+      const state=await db.prepare("SELECT window_start,requests,next_poll_at,blocked_until FROM feed_state WHERE id='aircraft-adsblol'").first();
+      const budget=aircraftBudget(checkPolicy,state);
+      return json({error:"The shared aircraft allowance is paused. The key check has not contacted the provider.",nextPollAt:budget.nextPollAt},429);
+    }
     const hexes=[...new Set(aircraft.map(r=>r.icao_hex))].join(",");
     const response=await fetchWithoutRedirect(policy.url+hexes,{headers:{"x-api-key":body.apiKey,"User-Agent":"Logic-Emergency-Air-Sea/1.0"},signal:AbortSignal.timeout(20_000)});
     if(!response.ok){
-      await db.prepare("UPDATE feed_state SET next_poll_at=? WHERE id='aircraft-key-validation'").bind(Date.now()+retryDelay(response)).run();
+      const until=Date.now()+retryDelay(response);
+      if(response.status===429)await db.prepare("UPDATE feed_state SET blocked_until=?,last_error=? WHERE id='aircraft-adsblol'").bind(until,"Key validation returned HTTP 429; collection paused.").run();
       return json({error:`adsb.lol returned HTTP ${response.status}. The new key has not been saved. Check its status on the provider’s My keys page.`},400);
     }
     const received=normalizeAircraft(await response.json(),aircraft);
@@ -44,7 +55,7 @@ export async function POST(request:Request){
     const time=Date.now();
     await db.batch([
       db.prepare("INSERT INTO feed_state(id,snapshot,fetched_at) VALUES('aircraft-api-key',?,?) ON CONFLICT(id) DO UPDATE SET snapshot=excluded.snapshot,fetched_at=excluded.fetched_at").bind(JSON.stringify(encrypted),time),
-      db.prepare("INSERT INTO feed_state(id,snapshot,fetched_at,next_poll_at,window_start,requests,blocked_until) VALUES('aircraft-adsblol',?,?,?,?,1,0) ON CONFLICT(id) DO UPDATE SET snapshot=excluded.snapshot,fetched_at=excluded.fetched_at,next_poll_at=excluded.next_poll_at,blocked_until=0,last_error=NULL,requests=CASE WHEN feed_state.window_start<=? THEN 1 ELSE feed_state.requests+1 END,window_start=CASE WHEN feed_state.window_start<=? THEN excluded.window_start ELSE feed_state.window_start END").bind(JSON.stringify(snapshot),time,time+policy.intervalMs,time,time-DAY_MS,time-DAY_MS),
+      db.prepare("UPDATE feed_state SET snapshot=?,fetched_at=?,last_error=CASE WHEN blocked_until<=? THEN NULL ELSE last_error END WHERE id='aircraft-adsblol'").bind(JSON.stringify(snapshot),time,time),
     ]);
     try{await captureAircraftTrails(received.records);}catch{ /* Positions remain available if the trail budget is paused. */ }
     return json({ok:true,configured:true,tier:body.tier,message:`Free aircraft key connected. ${snapshot.records.length} recent aircraft positions received. The map will use one shared feed within the ${policy.limit}-request daily budget.`});

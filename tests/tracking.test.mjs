@@ -15,7 +15,7 @@ test("10,000 visitors acquire one durable upstream lease; interval, cap and bloc
  assert.ok(call(now+DAY_MS));assert.equal(db.prepare("SELECT requests FROM feed_state").get().requests,1);
  db.prepare("UPDATE feed_state SET next_poll_at=0,blocked_until=?").run(now+DAY_MS+500_000);assert.equal(call(now+DAY_MS+1),undefined);db.close();
 });
-test("free aircraft policies cannot exceed documented quotas",()=>{const a=aircraftPolicy();assert.equal(a.limit,480);assert.equal(a.intervalMs,180_000);const b=aircraftPolicy("adsblol",true);assert.ok(b.limit<=1000);assert.ok(b.intervalMs>=90_000);assert.equal(aircraftPolicy("paid-unrecognised").provider,"adsblol");});
+test("free aircraft policies cannot exceed documented quotas",()=>{const a=aircraftPolicy();assert.equal(a.limit,495);assert.equal(a.intervalMs,Math.ceil(DAY_MS/495));const b=aircraftPolicy("adsblol",true);assert.ok(b.limit<=1000);assert.ok(b.intervalMs>=86_400);assert.equal(aircraftPolicy("paid-unrecognised").provider,"adsblol");});
 test("position freshness uses seen_pos; tower identities, missing coordinates and reused registrations are excluded",()=>{
  const valid={hex:"4077c7",r:"G-GSAS",lat:55.8,lon:-4.2,seen:1,seen_pos:45,gs:100};
  const output=normalizeAircraft({now,ac:[valid,{...valid,r:"TWR",type:"adsb_icao_nt"},{...valid,lat:undefined},{...valid,seen_pos:901}]},fleet,now);
