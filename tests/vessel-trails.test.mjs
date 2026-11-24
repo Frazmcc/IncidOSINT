@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import {build} from "esbuild";
-import {Miniflare} from "miniflare";
+import {Miniflare} from "./helpers/miniflare.mjs";
 import {groupVesselTrailRecords,mergeVesselTrailWindow,selectedVesselTrail,vesselWindowStart,VESSEL_HISTORY_MAX_BYTES,VESSEL_HISTORY_SAMPLE_MS} from "../lib/vessel-trails.mjs";
 
 const now=Date.now(),mmsi="232001234",name="Rescue boat";

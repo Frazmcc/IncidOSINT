@@ -1,13 +1,14 @@
+import type {Track} from "./tracking-types";
 import { env } from "cloudflare:workers";
 import { advanceTrailBatch, budgetedTrailUpdates, selectedTrail, TRAIL_SAMPLE_LIMIT, TRAIL_RETENTION_MS, RESERVE_TRAIL_BUDGET_SQL } from "./flight-trails.mjs";
 
 type TrailRow={icao:string;state:string;updated_at:number};
 const db=()=> (env as Cloudflare.Env).DB;
 
-export async function captureAircraftTrails(records:any[],now=Date.now()) {
+export async function captureAircraftTrails(records:Track[],now=Date.now()) {
  if(!records.length)return;
  const database=db();if(!database)throw Error("Trail storage unavailable");
- const existing=new Map<string,any>(),identifiers=[...new Set(records.map(r=>r.identifier))];
+ const existing=new Map<string,unknown>(),identifiers=[...new Set(records.map(r=>r.identifier))];
  for(let i=0;i<identifiers.length;i+=80){
   const ids=identifiers.slice(i,i+80);
   const result=await database.prepare(`SELECT icao,state,updated_at FROM aircraft_trails WHERE icao IN (${ids.map(()=>"?").join(",")})`).bind(...ids).all<TrailRow>();
@@ -25,7 +26,7 @@ export async function captureAircraftTrails(records:any[],now=Date.now()) {
 export async function aircraftTrail(hex:string) {
  const database=db();if(!database)throw Error("Trail storage unavailable");
  const row=await database.prepare("SELECT icao,state,updated_at FROM aircraft_trails WHERE icao=?").bind(hex).first<TrailRow>();
- let state:any=null;try{state=row?JSON.parse(row.state):null;}catch{}
+ let state:unknown=null;try{state=row?JSON.parse(row.state):null;}catch{}
  const flight=selectedTrail(state);
  const budget=await database.prepare("SELECT window_start,samples FROM trail_budget WHERE id='aircraft'").first<{window_start:number;samples:number}>();
  const captureBudgetPaused=Boolean(budget&&budget.samples>=TRAIL_SAMPLE_LIMIT&&Date.now()-budget.window_start<86_400_000);

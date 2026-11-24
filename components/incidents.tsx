@@ -1,9 +1,11 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
+import {useStoredFlag} from "../hooks/use-stored-flag";
 import {incidentMarkerVisible} from "../lib/map-display.mjs";
 import {Bell,BellOff,ExternalLink,Radio,TriangleAlert,X} from "lucide-react";
 
-export type IncidentEvent={id:string;kind:"incident";title:string;summary:string;sourceName:string;sourceUrl:string|null;relatedLinks?:string[];attribution:string;licenceUrl?:string;confidence:"reported"|"inferred";category:string;eventType:string;eventAt:number;firstSeenAt:number;timeBasis:string;lat:number|null;lon:number|null;locationBasis:string;assetId?:string;assetName?:string;identifier?:string};
+import type {IncidentEvent} from "../lib/tracking-types";
+export type {IncidentEvent} from "../lib/tracking-types";
 const time=(at:number)=>new Date(at).toLocaleString("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"Europe/London"});
 const link=(url:unknown)=>{try{const u=new URL(String(url));return ["https:","http:"].includes(u.protocol)&&!u.username&&!u.password?String(url):undefined;}catch{return undefined;}};
 type IncidentSource={id:string;name:string;home:string;status:string;region:string;note:string;checkedAt?:number|null;latestSourceAt?:number|null;message?:string;attribution?:string;licenceUrl?:string};
@@ -11,13 +13,14 @@ type IncidentSnapshot={events:IncidentEvent[];sources:IncidentSource[];servedAt:
 const initial:IncidentSnapshot={events:[],sources:[],servedAt:0,collectionMode:"",writeBudget:{paused:false}};
 
 export function useIncidentFeed(paused:boolean){
- const [data,setData]=useState<IncidentSnapshot>(initial),[error,setError]=useState(""),[loading,setLoading]=useState(true),[notifications,setNotifications]=useState(true),[pins,setPins]=useState(true),[notices,setNotices]=useState<IncidentEvent[]>([]);
+ const [data,setData]=useState<IncidentSnapshot>(initial),[error,setError]=useState(""),[loading,setLoading]=useState(true),[notices,setNotices]=useState<IncidentEvent[]>([]);
+ const [notifications,setNotifications]=useStoredFlag("incidosint-alerts"),[pins,setPins]=useStoredFlag("incidosint-incident-pins");
  const seen=useRef(new Set<string>()),seeded=useRef(false),enabled=useRef(true);
- useEffect(()=>{try{const on=localStorage.getItem("incidosint-alerts")!=="0";enabled.current=on;setNotifications(on);setPins(localStorage.getItem("incidosint-incident-pins")!=="0");}catch{}},[]);
- function toggleNotifications(){setNotifications(old=>{const next=!old;enabled.current=next;try{localStorage.setItem("incidosint-alerts",next?"1":"0");}catch{}return next;});setNotices([]);}
- function togglePins(){setPins(old=>{try{localStorage.setItem("incidosint-incident-pins",old?"0":"1");}catch{}return !old;});}
+ useEffect(()=>{enabled.current=notifications;},[notifications]);
+ function toggleNotifications(){setNotifications(!notifications);setNotices([]);}
+ function togglePins(){setPins(!pins);}
  useEffect(()=>{
-  if(paused){setLoading(false);return;}let active=true,busy=false;const controller=new AbortController();
+  if(paused)return;let active=true,busy=false;const controller=new AbortController();
   async function run(){
    if(busy||document.visibilityState==="hidden")return;busy=true;
    try{const response=await fetch("/api/incidents",{cache:"no-store",signal:controller.signal}),value:IncidentSnapshot=await response.json();if(!response.ok||value.error)throw Error(value.error||"Incident updates are temporarily unavailable.");
@@ -32,7 +35,7 @@ export function useIncidentFeed(paused:boolean){
   return()=>{active=false;controller.abort();clearInterval(timer);document.removeEventListener("visibilitychange",run);};
  },[paused]);
  useEffect(()=>{if(!notices.length)return;const timer=setTimeout(()=>setNotices([]),15_000);return()=>clearTimeout(timer);},[notices]);
- return {data,error,loading,notifications,toggleNotifications,pins,togglePins,notices,dismiss:(id:string)=>setNotices(rows=>rows.filter(r=>r.id!==id))};
+ return {data,error,loading:!paused&&loading,notifications,toggleNotifications,pins,togglePins,notices,dismiss:(id:string)=>setNotices(rows=>rows.filter(r=>r.id!==id))};
 }
 
 export function IncidentList({feed,now,onSelect}:{feed:ReturnType<typeof useIncidentFeed>;now:number;onSelect:(event:IncidentEvent)=>void}){

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 import {readFile} from 'node:fs/promises';
-import {Miniflare} from 'miniflare';
+import {Miniflare} from './helpers/miniflare.mjs';
 
 test('The real aircraft service API authenticates leases, shares its budget with map viewers and accepts a poll report once',async()=>{
  const compiled=await build({stdin:{contents:'import {POST} from "./app/api/collector/aircraft/route.ts";import {aircraftSnapshot} from "./lib/live-store.ts";export default {async fetch(r){return new URL(r.url).pathname==="/live"?Response.json(await aircraftSnapshot()):POST(r);}}',resolveDir:process.cwd()},bundle:true,format:'esm',platform:'neutral',mainFields:["module","main"],external:['cloudflare:workers'],write:false});

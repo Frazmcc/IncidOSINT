@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import {build} from "esbuild";
-import {Miniflare} from "miniflare";
+import {Miniflare} from "./helpers/miniflare.mjs";
 import {combineAircraftSnapshots} from "../lib/aircraft-fusion.mjs";
 import {advanceTrailBatch,budgetedTrailUpdates} from "../lib/flight-trails.mjs";
 import {vesselRouteView,vesselRouteDirections} from "../lib/vessel-route-view.mjs";

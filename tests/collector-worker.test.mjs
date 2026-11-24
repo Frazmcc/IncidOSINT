@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {Miniflare} from 'miniflare';
+import {Miniflare} from './helpers/miniflare.mjs';
 
 test('The real SQLite Durable Object authenticates controls and stays stopped without opening upstream sockets',async()=>{
   const bundle=JSON.parse(await readFile(new URL('../data/collector-bundle.json',import.meta.url)));

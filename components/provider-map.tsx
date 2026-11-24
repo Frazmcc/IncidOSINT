@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import {useEffect,useState} from "react";
 import {ChevronDown,ExternalLink,Map,Radio,Snowflake} from "lucide-react";
 import {GRITTER_SOURCE_URL,GRITTER_VIEW_URL,ROAD_AREAS,wazeViewUrl} from "../lib/road-views.mjs";
@@ -8,13 +9,14 @@ export function ProviderMap({provider}:{provider:"waze"|"gritters"}){
  const gritters=provider==="gritters",url=gritters?GRITTER_VIEW_URL:wazeViewUrl(area),external=gritters?GRITTER_VIEW_URL:wazeViewUrl(area,false);
  useEffect(()=>{
   if(!gritters)return;
-  try{const gl=document.createElement("canvas").getContext("webgl2");setGraphics(Boolean(gl));if(!gl)setLoading(false);gl?.getExtension("WEBGL_lose_context")?.loseContext();}
-  catch{setGraphics(false);setLoading(false);}
+  const frame=requestAnimationFrame(()=>{try{const gl=document.createElement("canvas").getContext("webgl2");setGraphics(Boolean(gl));if(!gl)setLoading(false);gl?.getExtension("WEBGL_lose_context")?.loseContext();}
+  catch{setGraphics(false);setLoading(false);}});
+  return()=>cancelAnimationFrame(frame);
  },[gritters]);
  return <main className={`provider-map-page provider-${provider}`}>
   {(!gritters||graphics===true)&&<iframe key={url} className="provider-map-frame" src={url} title={gritters?"Transport Scotland official gritter tracker":"Waze live road traffic"} referrerPolicy="strict-origin-when-cross-origin" allowFullScreen onLoad={()=>setLoading(false)} onError={()=>{setLoading(false);setError(true);}}/>}
   {gritters&&graphics===false&&<section className="provider-graphics-fallback" role="status"><Snowflake size={34}/><h2>This browser cannot display the gritter map</h2><p>The official viewer needs WebGL 2 graphics support. Use a compatible browser to open Transport Scotland’s tracker.</p><a href={GRITTER_VIEW_URL} target="_blank" rel="noreferrer">Open official gritter tracker<ExternalLink size={15}/></a></section>}
-  <a className="provider-back" href="/"><Map size={16}/>Return to aircraft & boats</a>
+  <Link className="provider-back" href="/"><Map size={16}/>Return to aircraft & boats</Link>
   <aside className="provider-map-card" aria-label={gritters?"Gritter map information":"Traffic map information"}>
    <span className="eyebrow">{gritters?<Snowflake size={15}/>:<Radio size={15}/>} {gritters?"OFFICIAL WINTER MAP":"ROAD TRAFFIC VIEW"}</span>
    <h1>{gritters?"Scottish gritters":"Waze traffic"}</h1>

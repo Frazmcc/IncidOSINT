@@ -1,37 +1,39 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Check, KeyRound, LockKeyhole, Radio, ShieldCheck, Ship, Plane } from "lucide-react";
 
+import type {CollectorSetup,CollectorStatus} from "../lib/tracking-types";
 export default function CloudflareConnection() {
   const [accountId,setAccountId]=useState("");
   const [cloudflareToken,setCloudflareToken]=useState("");
   const [aisKey,setAisKey]=useState("");
   const [freeConfirmed,setFreeConfirmed]=useState(false);
-  const [state,setState]=useState<any>(null);
-  const [status,setStatus]=useState<any>(null);
+  const [state,setState]=useState<CollectorSetup|null>(null);
+  const [status,setStatus]=useState<CollectorStatus|null>(null);
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState("");
   const [error,setError]=useState("");
-  useEffect(()=>{fetch("/api/setup/cloudflare",{cache:"no-store"}).then(r=>r.json()).then((v:any)=>{setState(v);if(v.collector?.accountId)setAccountId(v.collector.accountId);if(v.error)setError(v.error);}).catch(()=>setError("The setup page could not load. Refresh and try again."));},[]);
+  useEffect(()=>{fetch("/api/setup/cloudflare",{cache:"no-store"}).then(r=>r.json() as Promise<CollectorSetup>).then(v=>{setState(v);if(v.collector?.accountId)setAccountId(v.collector.accountId);if(v.error)setError(v.error);}).catch(()=>setError("The setup page could not load. Refresh and try again."));},[]);
   async function run(action:string) {
     setBusy(true);setError("");setMessage("");
     try {
       const r=await fetch("/api/setup/cloudflare",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(action==="deploy"?{action,accountId,cloudflareToken,aisKey,freeConfirmed}:{action})});
-      const v:any=await r.json();
-      if(v.collector){setState((old:any)=>({...old,collector:v.collector}));if(action==="deploy"){setCloudflareToken("");setAisKey("");}}
+      const v:CollectorSetup=await r.json();
+      if(v.collector){setState(old=>({...old,collector:v.collector}));if(action==="deploy"){setCloudflareToken("");setAisKey("");}}
       if(v.status)setStatus(v.status);
       if(v.error)setError(v.error);else setMessage(v.message||"Connection updated.");
     } catch {setError("The request did not finish. Use Check status before retrying deployment.");}
     finally {setBusy(false);}
   }
   const connected=Boolean(state?.collector);
-  useEffect(()=>{if(!connected||busy)return;let active=true;async function check(){try{const r=await fetch("/api/setup/cloudflare",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"status"})});const v:any=await r.json();if(active&&v.status)setStatus(v.status);}catch{}}void check();const timer=setInterval(()=>void check(),15000);return()=>{active=false;clearInterval(timer);};},[connected,busy]);
+  useEffect(()=>{if(!connected||busy)return;let active=true;async function check(){try{const r=await fetch("/api/setup/cloudflare",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"status"})});const v:CollectorSetup=await r.json();if(active&&v.status)setStatus(v.status);}catch{}}void check();const timer=setInterval(()=>void check(),15000);return()=>{active=false;clearInterval(timer);};},[connected,busy]);
   return <main className="connection-page">
-    <header className="connection-top"><a href="/">Emergency <b>Air & Sea</b><small>UK & IRELAND</small></a><a className="connection-back" href="/">Back to map</a></header>
+    <header className="connection-top"><Link href="/">Emergency <b>Air & Sea</b><small>UK & IRELAND</small></Link><Link className="connection-back" href="/">Back to map</Link></header>
     <div className="connection-content"><span className="connection-kicker"><LockKeyhole size={15}/> PRIVATE OWNER SETUP</span><h1>Connect the aircraft & boat collector</h1><p className="connection-lead">One background collector keeps aircraft and AIS updating while the map is closed. Your PC can stay switched off.</p>
       <div className="connection-layout"><section className="connection-form-card"><div className="connection-card-title"><Radio size={22}/><div><h2>Cloudflare Free connection</h2><p>{connected?"Enter a temporary Cloudflare token to update the deployed collector.":"Enter the account details and keys here."}</p></div></div>
         {state?.error&&<p className="connection-alert" role="alert">{state.error} <a href="/signin-with-chatgpt?return_to=%2Fconnect%2Fcloudflare" target="_top">Sign in</a></p>}
-        {connected&&status?.version!==2&&<p className="connection-alert">Update this collector to enable binary AIS decoding and background aircraft polling. Your existing AIS key can stay in place.</p>}{connected&&<div className="connection-deployed"><Check size={20}/><div><strong>Collector deployed</strong><small>{state.collector.url}</small></div></div>}
+        {connected&&status?.version!==2&&<p className="connection-alert">Update this collector to enable binary AIS decoding and background aircraft polling. Your existing AIS key can stay in place.</p>}{connected&&<div className="connection-deployed"><Check size={20}/><div><strong>Collector deployed</strong><small>{state?.collector?.url}</small></div></div>}
         {!state&&<p>Checking your private connection…</p>}
         {state&&!state.ready&&!state.error&&<p className="connection-alert">The website’s private connection is not ready yet. Your keys have not been requested.</p>}
         <form onSubmit={e=>{e.preventDefault();run("deploy");}} autoComplete="off">

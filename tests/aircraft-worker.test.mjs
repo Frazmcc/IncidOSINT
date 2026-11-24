@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
-import {Miniflare} from 'miniflare';
+import {Miniflare} from './helpers/miniflare.mjs';
 
 test('Background aircraft polling obtains a central lease, keeps site credentials off the provider request and reports success or retry limits',async()=>{
  const compiled=await build({stdin:{contents:'import {pollSharedAircraft} from "./collector/aircraft-poll.mjs";export default {async fetch(r,env){return Response.json(await pollSharedAircraft(env));}}',resolveDir:process.cwd()},bundle:true,format:'esm',platform:'neutral',write:false});

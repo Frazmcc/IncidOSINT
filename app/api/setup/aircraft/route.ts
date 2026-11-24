@@ -1,3 +1,4 @@
+import {parseJsonObject} from "../../../../lib/json-input";
 import { getChatGPTUser } from "../../../chatgpt-auth";
 import { runtimeEnv } from "../../../../lib/live-store";
 import { encryptAircraftKey, readAircraftKey } from "../../../../lib/aircraft-key.mjs";
@@ -22,8 +23,8 @@ export async function POST(request:Request){
   if(!setupRequestAllowed(request))return json({error:"Use this website’s private aircraft connection screen."},403);
   if(Number(request.headers.get("Content-Length")||0)>2000)return json({error:"Request too large."},413);
   const raw=await request.text();if(raw.length>2000)return json({error:"Request too large."},413);
-  let body:any;try{body=JSON.parse(raw);}catch{return json({error:"Invalid connection details."},400);}
-  if(!body||typeof body.apiKey!=="string"||body.apiKey.length<20||body.apiKey.length>512||/\s/.test(body.apiKey)||!["anonymous","adhoc"].includes(body.tier)||body.freeConfirmed!==true)return json({error:"Enter your free adsb.lol key, choose its free tier and confirm it is free."},400);
+  let body;try{body=parseJsonObject(raw);}catch{return json({error:"Invalid connection details."},400);}
+  if(!body||typeof body.apiKey!=="string"||body.apiKey.length<20||body.apiKey.length>512||/\s/.test(body.apiKey)||typeof body.tier!=="string"||!["anonymous","adhoc"].includes(body.tier)||body.freeConfirmed!==true)return json({error:"Enter your free adsb.lol key, choose its free tier and confirm it is free."},400);
   const env=config(),db=env.DB;
   if(!db||!env.AIRCRAFT_KEY_SECRET)return json({error:"Private aircraft-key storage is not configured."},503);
   const now=Date.now();

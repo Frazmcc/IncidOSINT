@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {build} from "esbuild";
-import {Miniflare} from "miniflare";
+import {Miniflare} from "./helpers/miniflare.mjs";
 import {readFile,readdir} from "node:fs/promises";
 
 test("shared incident sources fetch once across viewers, preserve old items, honour source caps and stop before the write budget",async()=>{
