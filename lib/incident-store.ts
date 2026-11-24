@@ -1,6 +1,7 @@
 import {INCIDENT_SOURCES,INCIDENT_RETENTION_MS,INCIDENT_WRITE_LIMIT} from "./incident-sources.mjs";
 import {detectAssetActivity,mergeIncidentEvents,parseIncidentFeed} from "./incident-core.mjs";
 import {RESERVE_POLL_SQL,DAY_MS} from "./tracking-core.mjs";
+import {parseRnliPage} from "./rnli-launches.mjs";
 import {fetchWithoutRedirect} from "./edge-fetch.mjs";
 
 type Row={id:string;snapshot:string;fetched_at:number;next_poll_at:number;window_start:number;requests:number;blocked_until:number;last_error:string|null};
@@ -40,11 +41,11 @@ export async function captureAssetActivity(db:D1Database,records:any[],now=Date.
  }
 }
 
-async function limitedText(response:Response){
- if(Number(response.headers.get("Content-Length")||0)>524288)throw Error("Incident feed exceeds its free processing limit.");
+async function limitedText(response:Response,limit=524288){
+ if(Number(response.headers.get("Content-Length")||0)>limit)throw Error("Incident feed exceeds its free processing limit.");
  if(!response.body)return "";
  const reader=response.body.getReader(),decoder=new TextDecoder();let bytes=0,text="";
- try{while(true){const {done,value}=await reader.read();if(done)break;bytes+=value.byteLength;if(bytes>524288)throw Error("Incident feed exceeds its free processing limit.");text+=decoder.decode(value,{stream:true});}return text+decoder.decode();}
+ try{while(true){const {done,value}=await reader.read();if(done)break;bytes+=value.byteLength;if(bytes>limit)throw Error("Incident feed exceeds its free processing limit.");text+=decoder.decode(value,{stream:true});}return text+decoder.decode();}
  finally{await reader.cancel().catch(()=>{});}
 }
 
@@ -59,13 +60,13 @@ export async function refreshIncidentFeeds(db:D1Database,now=Date.now()){
   const reserved=await db.prepare(RESERVE_POLL_SQL).bind(now+source.intervalMs!,now-DAY_MS,now,id,source.limit!).first();
   if(!reserved)return;
   try{
-   const response=await fetchWithoutRedirect(source.url!,{headers:{Accept:"application/rss+xml, application/xml, text/xml","User-Agent":"IncidOSINT/1.0 (+https://logic-uk-ireland-rescue-vessels.starrycapybara8.chatgpt.site/)"},signal:AbortSignal.timeout(6000)});
+   const response=await fetchWithoutRedirect(source.url!,{headers:{Accept:source.id==="rnli"?"text/html":"application/rss+xml, application/xml, text/xml","User-Agent":"IncidOSINT/1.0 (+https://logic-uk-ireland-rescue-vessels.starrycapybara8.chatgpt.site/)"},signal:AbortSignal.timeout(6000)});
    if(!response.ok){
     const header=response.headers.get("Retry-After"),seconds=Number(header),date=header?Date.parse(header):NaN,retry=header&&Number.isFinite(seconds)&&seconds>=0?seconds*1000:Number.isFinite(date)?Math.max(0,date-now):0;
     const until=now+(response.status===429?Math.max(3_600_000,retry):response.status===401||response.status===403?DAY_MS:source.intervalMs!);
     await db.prepare("UPDATE feed_state SET blocked_until=?,last_error=? WHERE id=?").bind(until,`Source returned HTTP ${response.status}; retaining earlier reports.`,id).run();return;
    }
-   const result=parseIncidentFeed(await limitedText(response),source,now);
+   const result=source.id==="rnli"?await parseRnliPage(await limitedText(response,2_097_152),source,now):parseIncidentFeed(await limitedText(response),source,now);
    await saveIncidentEvents(db,result.events,now);
    const info={latestSourceAt:result.latestSourceAt,receivedItems:result.receivedItems};
    await db.prepare("UPDATE feed_state SET snapshot=?,fetched_at=?,blocked_until=0,last_error=NULL WHERE id=?").bind(JSON.stringify(info),now,id).run();
@@ -83,5 +84,5 @@ export async function incidentSnapshot(db:D1Database,now=Date.now()){
   const stale=Boolean(info.latestSourceAt&&now-info.latestSourceAt>INCIDENT_RETENTION_MS);
   return {...source,url:undefined,status:!source.enabled?source.status:row?.last_error||capped?"paused":!row?.fetched_at?"waiting":stale?"stale":"receiving",checkedAt:row?.fetched_at||null,latestSourceAt:info.latestSourceAt||null,receivedItems:info.receivedItems??null,requestsUsed:row?.requests||0,nextCheckAt:row?Math.max(row.next_poll_at,row.blocked_until,capped?row.window_start+DAY_MS:0):null,message:row?.last_error|| (stale?"The source was checked, but its latest incident item is older than 24 hours.":"")};
  });
- return {events,sources,servedAt:now,retentionHours:24,pollSeconds:30,sensitivity:"balanced",eventLimit:250,collectionMode:heartbeat&&now-heartbeat.fetched_at<180_000?"background":"on-demand",writeBudget:{used:budget?.requests||0,limit:INCIDENT_WRITE_LIMIT,paused:Boolean(budget&&budget.requests>=INCIDENT_WRITE_LIMIT&&now-budget.window_start<DAY_MS)},message:"Reported road incidents and inferred aircraft/vessel activity are separate. An activity pin is the asset position at detection, not a confirmed incident location."};
+ return {events,sources,servedAt:now,retentionHours:24,pollSeconds:30,sensitivity:"balanced",eventLimit:250,collectionMode:heartbeat&&now-heartbeat.fetched_at<180_000?"background":"on-demand",writeBudget:{used:budget?.requests||0,limit:INCIDENT_WRITE_LIMIT,paused:Boolean(budget&&budget.requests>=INCIDENT_WRITE_LIMIT&&now-budget.window_start<DAY_MS)},message:"Published lifeboat launches, road reports and inferred aircraft/vessel activity are separate. RNLI pins identify stations, not emergencies. An activity pin is the asset position at detection, not a confirmed incident location."};
 }
