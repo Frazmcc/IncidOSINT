@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { advanceTrailBatch, selectedTrail, TRAIL_SAMPLE_LIMIT, TRAIL_RETENTION_MS, RESERVE_TRAIL_BUDGET_SQL } from "./flight-trails.mjs";
+import { advanceTrailBatch, budgetedTrailUpdates, selectedTrail, TRAIL_SAMPLE_LIMIT, TRAIL_RETENTION_MS, RESERVE_TRAIL_BUDGET_SQL } from "./flight-trails.mjs";
 
 type TrailRow={icao:string;state:string;updated_at:number};
 const db=()=> (env as Cloudflare.Env).DB;
@@ -13,9 +13,10 @@ export async function captureAircraftTrails(records:any[],now=Date.now()) {
   const result=await database.prepare(`SELECT icao,state,updated_at FROM aircraft_trails WHERE icao IN (${ids.map(()=>"?").join(",")})`).bind(...ids).all<TrailRow>();
   for(const row of result.results || [])try{existing.set(row.icao,JSON.parse(row.state));}catch{}
  }
- const next=advanceTrailBatch(records,existing,now);
- if(!next.length)return;
  await database.prepare("INSERT INTO trail_budget (id,window_start,samples) VALUES ('aircraft',?,0) ON CONFLICT(id) DO NOTHING").bind(now).run();
+ const budget=await database.prepare("SELECT window_start,samples FROM trail_budget WHERE id='aircraft'").first<{window_start:number;samples:number}>();
+ const next=budgetedTrailUpdates(advanceTrailBatch(records,existing,now),existing,records,budget,now);
+ if(!next.length)return;
  const reserved=await database.prepare(RESERVE_TRAIL_BUDGET_SQL).bind(now-86_400_000,now,next.length,TRAIL_SAMPLE_LIMIT).first();
  if(!reserved)return;
  for(let i=0;i<next.length;i+=40)await database.batch(next.slice(i,i+40).map(({record,state})=>database.prepare("INSERT INTO aircraft_trails (icao,state,updated_at) VALUES (?,?,?) ON CONFLICT(icao) DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at WHERE aircraft_trails.updated_at<excluded.updated_at").bind(record.identifier,JSON.stringify(state),record.observedAt)));

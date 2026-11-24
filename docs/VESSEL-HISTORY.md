@@ -30,3 +30,10 @@ existing positions, aircraft trails, secrets or subscription settings. Storage
 failures leave live positions available, and the history response reports a
 capture pause. Cloudflare account-wide Free quotas still apply and can stop
 service. The implementation does not enable a paid plan or paid fallback.
+
+The selected route now uses a dark outline and bright cyan centre for contrast
+on satellite imagery. Start/Latest flags and direction chevrons identify the
+recorded path. The map fits the selected period while allowing room for the
+details card, and re-fits when the first actual route arrives after a single
+position. Single-position and same-location histories explicitly explain why
+there is no distinct path. Reception gaps remain open.

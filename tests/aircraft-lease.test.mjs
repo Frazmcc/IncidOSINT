@@ -7,7 +7,7 @@ import {Miniflare} from 'miniflare';
 test('The real aircraft service API authenticates leases, shares its budget with map viewers and accepts a poll report once',async()=>{
  const compiled=await build({stdin:{contents:'import {POST} from "./app/api/collector/aircraft/route.ts";import {aircraftSnapshot} from "./lib/live-store.ts";export default {async fetch(r){return new URL(r.url).pathname==="/live"?Response.json(await aircraftSnapshot()):POST(r);}}',resolveDir:process.cwd()},bundle:true,format:'esm',platform:'neutral',mainFields:["module","main"],external:['cloudflare:workers'],write:false});
  let upstream=0;
- const mf=new Miniflare({modules:true,script:compiled.outputFiles[0].text,compatibilityDate:'2026-05-22',d1Databases:{DB:'aircraft-test'},bindings:{VESSEL_INGEST_TOKEN:'synthetic-control-token',ADSB_LOL_FREE_KEY:'synthetic-provider-key'},outboundService:()=>{upstream++;throw Error('Map requests must use the worker cache, never upstream.');}});
+ const mf=new Miniflare({modules:true,script:compiled.outputFiles[0].text,compatibilityDate:'2026-05-22',d1Databases:{DB:'aircraft-test'},bindings:{VESSEL_INGEST_TOKEN:'synthetic-control-token',ADSB_LOL_FREE_KEY:'synthetic-provider-key',ADSB_FI_ENABLED:'false'},outboundService:()=>{upstream++;throw Error('Map requests must use the worker cache, never upstream.');}});
  try{
   const db=await mf.getD1Database('DB');
   for(const name of ['0000_wealthy_wild_child.sql','0001_burly_ink.sql']){

@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useState} from "react";
 import {VESSEL_HISTORY_DEFAULT_HOURS,VESSEL_HISTORY_HOURS} from "../lib/vessel-trails.mjs";
+import {vesselRouteView} from "../lib/vessel-route-view.mjs";
 
 export function useVesselTrack(mmsi:string|null, hours:number, paused:boolean) {
  const [data,setData]=useState<any>(null),[error,setError]=useState(""),[loading,setLoading]=useState(false);
@@ -21,10 +22,12 @@ export function useVesselTrack(mmsi:string|null, hours:number, paused:boolean) {
 }
 const clock=(at:number)=>new Date(at).toLocaleString("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"Europe/London"});
 export function VesselTrackPanel({data,error,loading,hours,onHoursChange,visible,onToggle,onFit}:{data:any;error:string;loading:boolean;hours:number;onHoursChange:(hours:number)=>void;visible:boolean;onToggle:()=>void;onFit:()=>void}) {
+ const view=vesselRouteView(data);
  return <section className="flight-track-panel vessel-track-panel" aria-label="Selected vessel AIS history">
   <div className="flight-track-heading"><label><input type="checkbox" checked={visible} onChange={onToggle}/>Vessel track</label><button onClick={onFit} disabled={!data?.points?.length}>Fit track</button></div>
   <label className="vessel-history-period">Show the last<select value={hours} onChange={e=>onHoursChange(Number(e.target.value)||VESSEL_HISTORY_DEFAULT_HOURS)}>{VESSEL_HISTORY_HOURS.map(value=><option key={value} value={value}>{value===0.5?"30 minutes":`${value} ${value===1?"hour":"hours"}`}</option>)}</select></label>
-  {error?<p className="track-warning" role="status">{error}</p>:data?.points?.length?<><strong className="flight-track-status">{data.points.length} received AIS positions</strong><dl><div><dt>First in this view</dt><dd>{clock(data.firstAt)}</dd></div><div><dt>Last received</dt><dd>{clock(data.lastAt)}</dd></div></dl>{data.gaps&&<p>Reception gaps and position jumps are left open.</p>}</>:<p role="status">{loading?"Loading vessel history…":data?.message||"No AIS history received in this time window yet."}</p>}
+  {data&&<p className="vessel-route-summary" role="status"><span className="vessel-route-swatch"/>{view.message}</p>}
+  {error?<p className="track-warning" role="status">{error}</p>:data?.points?.length?<><strong className="flight-track-status">{data.points.length} received AIS position{data.points.length===1?"":"s"}</strong><dl><div><dt>First in this view</dt><dd>{clock(data.firstAt)}</dd></div><div><dt>Last received</dt><dd>{clock(data.lastAt)}</dd></div></dl>{data.gaps&&<p>Reception gaps and position jumps are left open.</p>}</>:<p role="status">{loading?"Loading vessel history…":data?.message||"No AIS history received in this time window yet."}</p>}
   {data?.partialWindow&&data?.recordingStartedAt&&<p>History recording started {clock(data.recordingStartedAt)}. Earlier routes are unavailable.</p>}
   {data?.captureBudgetPaused&&<p className="track-warning">History recording is paused at its free daily limit.</p>}
   {data?.points?.length&&data?.message!=="Recorded AIS positions"?<p className="track-warning">{data.message}</p>:null}

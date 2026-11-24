@@ -1,4 +1,4 @@
-import {runtimeEnv,recordAircraftPayload} from "../../../../lib/live-store";
+import {runtimeEnv,recordAircraftPayload,pollSupplementalAircraft} from "../../../../lib/live-store";
 import {readAircraftKey} from "../../../../lib/aircraft-key.mjs";
 import {aircraftPolicy,RESERVE_POLL_SQL,DAY_MS,retryDelay} from "../../../../lib/tracking-core.mjs";
 import fleet from "../../../../data/aircraft.json";
@@ -17,6 +17,7 @@ export async function POST(request:Request){
   if(body.action==="lease"){
     await db.prepare("INSERT INTO feed_state(id,snapshot) VALUES('aircraft-adsblol','{\"records\":[]}') ON CONFLICT(id) DO NOTHING").run();
     await db.prepare("INSERT INTO feed_state(id,snapshot,fetched_at) VALUES('aircraft-worker','{}',?) ON CONFLICT(id) DO UPDATE SET fetched_at=excluded.fetched_at").bind(now).run();
+    try{await pollSupplementalAircraft(now);}catch{console.warn("Supplementary aircraft check-in could not finish");}
     const reserved=await db.prepare(RESERVE_POLL_SQL).bind(now+policy.intervalMs,now-DAY_MS,now,"aircraft-adsblol",policy.limit).first();
     if(!reserved){
       const state=await db.prepare("SELECT next_poll_at,blocked_until,window_start,requests,last_error FROM feed_state WHERE id='aircraft-adsblol'").first<any>();
