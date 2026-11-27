@@ -4,7 +4,7 @@ import {readFile} from "node:fs/promises";
 import {build} from "esbuild";
 import {Miniflare} from "./helpers/miniflare.mjs";
 import {createFastCollector} from "../collector/render-aircraft.mjs";
-import {fastProviderUrl,compactAircraftPayload,FAST_POLL_MS,FAST_BATCH_REQUESTS} from "../lib/aircraft-fast-policy.mjs";
+import {fastProviderUrl,compactAircraftPayload,FAST_POLL_MS,FAST_BATCH_REQUESTS,FAST_CONNECT_TIMEOUT_MS,FAST_CLIENT_TIMEOUT_MS} from "../lib/aircraft-fast-policy.mjs";
 import {blendAircraftLive} from "../lib/aircraft-live-view.mjs";
 import {normalizeAircraft} from "../lib/tracking-core.mjs";
 import {advanceTrail,compactFlightPoints} from "../lib/flight-trails.mjs";
@@ -82,4 +82,16 @@ test("real D1 permits are shared across collectors and survive failed reports, r
   const state=await db.prepare("SELECT requests,blocked_until FROM feed_state WHERE id='aircraft-adsbfi-fast-budget'").first();assert.equal(state.requests,2);assert.ok(state.blocked_until>Date.now()+7190000);
   await db.prepare("UPDATE feed_state SET requests=2880,blocked_until=0,next_poll_at=0 WHERE id='aircraft-adsbfi-fast-budget'").run();assert.equal((await (await call({action:"lease"})).json()).acquired,false);
  }finally{await mf.dispose();}
+});
+
+
+test("cold-start recovery leaves room for the server response and never falsely reports an old fix as receiving",async()=>{
+ assert.ok(FAST_CONNECT_TIMEOUT_MS>8000);assert.ok(FAST_CLIENT_TIMEOUT_MS>FAST_CONNECT_TIMEOUT_MS);
+ let now=Date.now(),reported=false;const timers=[];
+ const collector=createFastCollector({siteUrl:"https://site.test",token,fleet,clock:()=>now,schedule:(callback,delay)=>{timers.push({callback,delay});return timers.length;},fetcher:async(input,init)=>{
+  if(new URL(input).hostname==="site.test"){const body=JSON.parse(init.body);if(body.action==="lease")return Response.json({acquired:true,pollId:"wake",url:`https://opendata.adsb.fi/api/v2/icao/${plane.icao_hex}`,expiresAt:now+30000,intervalMs:2100,maximumRequests:1});reported=true;return Response.json({accepted:true});}
+  return Response.json({now,ac:[ac]});
+ }});
+ collector.demand();for(let i=0;i<30&&!reported;i++)await flush();
+ assert.equal(collector.view().status,"receiving");const stamp=collector.view().fetchedAt;now+=16000;assert.equal(collector.view().status,"waiting");assert.equal(collector.view().fetchedAt,stamp);collector.stop();
 });

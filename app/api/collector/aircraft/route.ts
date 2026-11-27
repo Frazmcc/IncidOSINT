@@ -2,7 +2,7 @@ import {parseJsonObject} from "../../../../lib/json-input";
 import type {FeedBudgetRow} from "../../../../lib/tracking-types";
 import {runtimeEnv,recordAircraftPayload,pollSupplementalAircraft} from "../../../../lib/live-store";
 import {readAircraftKey} from "../../../../lib/aircraft-key.mjs";
-import {aircraftPolicy,retryDelay} from "../../../../lib/tracking-core.mjs";
+import {aircraftPolicy,retryDelay,REPAIR_RETRY_AFTER_SQL,retryRepairArgs} from "../../../../lib/tracking-core.mjs";
 import {aircraftBudget,aircraftReservationArgs,RESERVE_AIRCRAFT_SQL} from "../../../../lib/aircraft-budget.mjs";
 import fleet from "../../../../data/aircraft.json";
 export const dynamic="force-dynamic";
@@ -20,6 +20,7 @@ export async function POST(request:Request){
   if(body.action==="lease"){
     await db.prepare("INSERT INTO feed_state(id,snapshot) VALUES('aircraft-adsblol','{\"records\":[]}') ON CONFLICT(id) DO NOTHING").run();
     await db.prepare("INSERT INTO feed_state(id,snapshot,fetched_at) VALUES('aircraft-worker','{}',?) ON CONFLICT(id) DO UPDATE SET fetched_at=excluded.fetched_at").bind(now).run();
+    await db.prepare(REPAIR_RETRY_AFTER_SQL).bind(...retryRepairArgs("aircraft-adsblol",now)).first();
     try{await pollSupplementalAircraft(now);}catch{console.warn("Supplementary aircraft check-in could not finish");}
     const reserved=await db.prepare(RESERVE_AIRCRAFT_SQL).bind(...aircraftReservationArgs(policy,now)).first<{requests:number;next_poll_at:number;window_start:number}>();
     if(!reserved){

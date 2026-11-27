@@ -21,7 +21,7 @@ export function createFastCollector({siteUrl,token,fleet,fetcher=fetchWithoutRed
   if(!response.ok)throw Error(`Aircraft coordinator returned HTTP ${response.status}`);
   return response.json();
  }
- function view(){const fields=["id","kind","identifier","name","callsign","lat","lon","observedAt","receivedAt","speed","heading","altitude","onGround","squawk","squawkObservedAt","typeCode","timeBasis"];return {...snapshot,records:snapshot.records.map(r=>Object.fromEntries(fields.filter(k=>r[k]!==undefined).map(k=>[k,r[k]]))),fetchedAt:fetchedAt||null,nextPollAt:nextPollAt||null,status,message,intervalSeconds:FAST_POLL_MS/1000,generation};}
+ function view(){const fields=["id","kind","identifier","name","callsign","lat","lon","observedAt","receivedAt","speed","heading","altitude","onGround","squawk","squawkObservedAt","typeCode","timeBasis"];const currentStatus=status==="receiving"&&clock()-fetchedAt>15_000?"waiting":status;return {...snapshot,records:snapshot.records.map(r=>Object.fromEntries(fields.filter(k=>r[k]!==undefined).map(k=>[k,r[k]]))),fetchedAt:fetchedAt||null,nextPollAt:nextPollAt||null,status:currentStatus,message,intervalSeconds:FAST_POLL_MS/1000,generation};}
  async function cycle(){
   if(busy||stopped||clock()-lastDemand>60_000)return;
   busy=true;
@@ -56,7 +56,7 @@ export function createFastCollector({siteUrl,token,fleet,fetcher=fetchWithoutRed
     nextPollAt=Math.max(reported.nextPollAt||lease.expiresAt,backoffUntil);
     if(!reported.accepted){status="paused";message=`adsb.fi returned HTTP ${statusCode}; collection is paused.`;console.info("Aircraft source paused",statusCode);}
    }else nextPollAt=lease.expiresAt;
-  }catch{status="waiting";message="The shared aircraft collector is reconnecting.";nextPollAt=Math.max(clock()+30_000,backoffUntil);}
+  }catch(error){status="waiting";message="The shared aircraft collector is reconnecting.";nextPollAt=Math.max(clock()+30_000,backoffUntil);console.warn("Aircraft collector reconnecting",error instanceof Error&&/^Aircraft coordinator returned HTTP \d{3}$/.test(error.message)?error.message:"Request timeout or invalid response");}
   finally{
    busy=false;
    if(!stopped&&clock()-lastDemand<=60_000)timer=schedule(()=>{timer=null;void cycle();},Math.max(250,nextPollAt-clock()));

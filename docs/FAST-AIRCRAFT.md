@@ -52,6 +52,26 @@ Official limits: https://render.com/docs/free
 Public aircraft terms: https://github.com/adsbfi/opendata
 adsb.lol UTC reset: https://www.adsb.lol/docs/open-data/api
 
+## Recovery and source age
+
+Retry-After values are validated before they become a stored deadline. Normal
+seconds, HTTP dates, and near-future epoch values are supported; malformed or
+implausibly distant values use the existing bounded fallback. The parser
+accepts cooldowns up to seven days, below Node's timer-overflow range.
+
+Authenticated collector check-ins repair the impossible HTTP-429 deadlines
+created by the previous parser. Repair preserves request counters, allowance
+windows, and ordinary provider cooldowns; it does not reset a free quota.
+
+The fast-feed proxy allows 25 seconds per connection attempt, inside the
+browser's 30-second request deadline. Render can still need about a minute to
+wake. A temporary missing configuration is checked again after 60 seconds,
+rather than disabling fast updates for the rest of that page visit. During
+startup the map describes the wait without claiming the backup is healthy.
+The collector retains original observation times and stops reporting an old
+cached fetch as receiving. Its reconnect logs contain only safe error
+categories or the coordinator HTTP status, never credentials.
+
 ## Configuration
 
 Render runs `node collector/render-aircraft.mjs` without installing the website

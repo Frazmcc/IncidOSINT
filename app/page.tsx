@@ -10,6 +10,7 @@ type TrackEntry={record:Track;position:{lat:number;lon:number;heading:number};mo
 const latLng=(p:{lat:number;lon:number}):Leaflet.LatLngTuple=>[p.lat,p.lon];
 import {Anchor,ChevronDown,Clock3,Globe2,Info,Layers3,LocateFixed,MapPin,PanelLeftClose,PanelLeftOpen,Pause,Plane,Play,Radio,RefreshCw,Ship,SlidersHorizontal,X} from "lucide-react";
 import {blendAircraftLive} from "../lib/aircraft-live-view.mjs";
+import {FAST_CLIENT_TIMEOUT_MS} from "../lib/aircraft-fast-policy.mjs";
 import {createAircraftMotion,sampleAircraftMotion} from "../lib/aircraft-motion.mjs";
 import {ASSET_TYPES,assetType,assetSvg} from "../lib/asset-types.mjs";
 import {AssetSymbol} from "../components/asset-symbol";
@@ -62,10 +63,10 @@ export default function MapPage(){
  async function refresh(){if(fetching.current||Date.now()-lastFetch.current<10_000)return;fetching.current=true;lastFetch.current=Date.now();setLoading(true);try{const r=await fetch("/api/live");const d:LiveSnapshot=await r.json();if(!r.ok||d.error)throw Error(d.error||"Tracking is temporarily unavailable.");setData({...d,aircraft:blendAircraftLive(d.aircraft,fastAircraft.current)});setError("");}catch(e){setError(e instanceof Error?e.message:"Tracking is temporarily unavailable.");}finally{fetching.current=false;setLoading(false);}}
  useEffect(()=>{if(paused)return;const run=()=>{if(document.visibilityState!=="hidden")void refresh();};run();const timer=setInterval(run,10_000);document.addEventListener("visibilitychange",run);return()=>{clearInterval(timer);document.removeEventListener("visibilitychange",run);};},[paused]);
  useEffect(()=>{
-  if(paused)return;let active=true,enabled=true;
-  const run=async()=>{if(!active||!enabled||fastFetching.current||document.visibilityState==="hidden")return;
-   fastFetching.current=true;try{const response=await fetch("/api/live/aircraft",{cache:"no-store",signal:AbortSignal.timeout(12_000)});if(!response.ok)return;
-    const incoming:FastAircraftFeed=await response.json();if(incoming.enabled===false){enabled=false;return;}if(!active)return;
+  if(paused)return;let active=true,nextCheckAt=0;
+  const run=async()=>{if(!active||Date.now()<nextCheckAt||fastFetching.current||document.visibilityState==="hidden")return;
+   fastFetching.current=true;try{const response=await fetch("/api/live/aircraft",{cache:"no-store",signal:AbortSignal.timeout(FAST_CLIENT_TIMEOUT_MS)});if(!response.ok)return;
+    const incoming:FastAircraftFeed=await response.json();if(incoming.enabled===false){nextCheckAt=Date.now()+60_000;return;}if(!active)return;
     const prior=fastAircraft.current;fastAircraft.current=incoming.fetchedAt?incoming:{...incoming,records:prior?.records||[],unpositioned:prior?.unpositioned||[],fetchedAt:prior?.fetchedAt||null};
     setData(previous=>({...previous,aircraft:blendAircraftLive(previous.aircraft,fastAircraft.current)}));
    }catch{}finally{fastFetching.current=false;}};

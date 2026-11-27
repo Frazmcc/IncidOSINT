@@ -1,7 +1,7 @@
 import {parseJsonObject} from "../../../../lib/json-input";
 import type {FeedBudgetRow} from "../../../../lib/tracking-types";
 import {runtimeEnv,recordAircraftPayload} from "../../../../lib/live-store";
-import {RESERVE_POLL_SQL,DAY_MS,retryDelay} from "../../../../lib/tracking-core.mjs";
+import {RESERVE_POLL_SQL,DAY_MS,retryDelay,REPAIR_RETRY_AFTER_SQL,retryRepairArgs} from "../../../../lib/tracking-core.mjs";
 import {FAST_POLL_MS,FAST_LEASE_MS,FAST_BATCH_REQUESTS,FAST_DAILY_LEASES,FAST_DAILY_REQUESTS,FAST_BUDGET_ID} from "../../../../lib/aircraft-fast-policy.mjs";
 import fleet from "../../../../data/aircraft.json";
 export const dynamic="force-dynamic";
@@ -17,6 +17,7 @@ export async function POST(request:Request){
  const now=Date.now();
  await db.prepare("INSERT INTO feed_state(id,snapshot) VALUES(?, '{}') ON CONFLICT(id) DO NOTHING").bind(FAST_BUDGET_ID).run();
  if(body.action==="lease"){
+  await db.prepare(REPAIR_RETRY_AFTER_SQL).bind(...retryRepairArgs(FAST_BUDGET_ID,now)).first();
   const acquired=await db.prepare(RESERVE_POLL_SQL).bind(now+FAST_LEASE_MS,now-DAY_MS,now,FAST_BUDGET_ID,FAST_DAILY_LEASES).first();
   if(!acquired){
    const row=await db.prepare("SELECT next_poll_at,blocked_until,window_start,requests FROM feed_state WHERE id=?").bind(FAST_BUDGET_ID).first<FeedBudgetRow>();

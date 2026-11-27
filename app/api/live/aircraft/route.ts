@@ -3,6 +3,7 @@ import type {FastAircraftFeed,Track} from "../../../../lib/tracking-types";
 import {runtimeEnv} from "../../../../lib/live-store";
 import {combineAircraftSnapshots} from "../../../../lib/aircraft-fusion.mjs";
 import {fetchWithoutRedirect} from "../../../../lib/edge-fetch.mjs";
+import {FAST_CONNECT_TIMEOUT_MS,FAST_USER_AGENT} from "../../../../lib/aircraft-fast-policy.mjs";
 import {groupFor} from "../../../../lib/tracking-core.mjs";
 import fleet from "../../../../data/aircraft.json";
 export const dynamic="force-dynamic";
@@ -18,7 +19,7 @@ export async function GET(request:Request){
  if(!memo||now-memo.at>=2_000){
   pending ||= (async()=>{
    try{
-    const response=await fetchWithoutRedirect(url,{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(8_000)});
+    const response=await fetchWithoutRedirect(url,{headers:{Authorization:`Bearer ${token}`,"User-Agent":FAST_USER_AGENT,Accept:"application/json"},signal:AbortSignal.timeout(FAST_CONNECT_TIMEOUT_MS)});
     if(!response.ok)throw Error();const raw=await response.text();if(raw.length>500_000)throw Error();
     const value=parseJsonObject(raw);if(!value)throw Error();const known=new Map(fleet.map(a=>[a.icao_hex,a]));
     const fields=["id","kind","identifier","name","lat","lon","observedAt","receivedAt","speed","heading","altitude","onGround","squawk","squawkObservedAt","typeCode","timeBasis","lastSeenAt","callsign"];
@@ -28,7 +29,7 @@ export async function GET(request:Request){
     const filtered=combineAircraftSnapshots([{records,unpositioned}],Date.now(),fleet);
     filtered.records=filtered.records.map((r:Track)=>{const meta=known.get(r.identifier)!;return {...r,service:meta.service,category:groupFor(meta.category),fleetCategory:meta.category,territory:meta.territory,typeCode:meta.type_code||r.typeCode,notes:meta.notes,fleetStatus:meta.fleet_status,sourceUrl:meta.identity_source,fleetSource:meta.fleet_source,feedProvider:"adsb.fi"};});
     return {enabled:true,...filtered,fetchedAt:Number(value.fetchedAt)||null,nextPollAt:Number(value.nextPollAt)||null,status:typeof value.status==="string"&&["receiving","waiting","paused"].includes(value.status)?value.status:"waiting",message:String(value.message||"").slice(0,200),intervalSeconds:2.1};
-   }catch{return {enabled:true,records:[],unpositioned:[],status:"waiting",message:"The free aircraft collector is starting or temporarily unavailable. The shared backup feed remains available.",fetchedAt:null,intervalSeconds:2.1};}
+   }catch{return {enabled:true,records:[],unpositioned:[],status:"waiting",message:"The free aircraft collector is waking or temporarily unavailable. Startup can take about a minute; saved positions keep their original report times.",fetchedAt:null,intervalSeconds:2.1};}
   })();
   try{const body=await pending;memo={at:Date.now(),body};}finally{pending=null;}
  }
